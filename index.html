@@ -1,665 +1,1927 @@
-/**
- * ============================================================
- *  Action Plan หน่วยไตเทียม — Google Apps Script (Backend)
- *  กลุ่มการพยาบาล สถาบันบำราศนราดูร
- * ------------------------------------------------------------
- *  - สร้างชีตและคอลัมน์ที่ยังไม่มีให้อัตโนมัติทุกครั้งที่เรียกใช้
- *  - ใส่ข้อมูลแผนปฏิบัติงานตั้งต้น (บริบทหน่วยไตเทียม) ครั้งแรกครั้งเดียว
- *  - รับ/ส่งข้อมูลเป็น JSON ให้หน้าเว็บ (GitHub Pages หรือที่อื่น)
- *
- *  วิธีติดตั้ง
- *   1) วางโค้ดนี้แทนโค้ดเดิมทั้งหมดใน Code.gs แล้วกดบันทึก
- *   2) เลือกฟังก์ชัน setup แล้วกด "เรียกใช้" 1 ครั้ง (อนุญาตสิทธิ์)
- *   3) ทำให้ใช้งานได้ > จัดการการทำให้ใช้งานได้ > แก้ไข (รูปดินสอ)
- *      > เวอร์ชัน: "เวอร์ชันใหม่" > ทำให้ใช้งานได้
- *      (ดำเนินการในฐานะ: ฉัน / ผู้มีสิทธิ์เข้าถึง: ทุกคน)
- * ============================================================
- */
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081430">
+<title>Action Plan · แผนปฏิบัติงาน หน่วยไตเทียม</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Sarabun:wght@300;400;500;600;700;800&family=Taviraj:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#040a1c; --bg1:#081430; --bg2:#0d1d47; --bg3:#142b66; --bg4:#1c3a85;
+  --gold:#d4a73c; --gold-l:#f1d68a; --gold-xl:#fff2c6; --gold-d:#9a7023; --gold-dd:#6e4f17;
+  --cream:#fbf6ea; --cream-2:#f3e8cc; --cream-3:#e6d2a0;
+  --ink:#14204a; --ink-2:#3a4572; --muted:#8e97b8; --muted-2:#6b7394;
+  --line:rgba(212,167,60,.40); --line-2:rgba(212,167,60,.18);
+  --ok:#43d39e; --bad:#ff7b7b; --warn:#f5c04a;
+  --side:280px; --top:66px;
+  --f-th:'Sarabun','Leelawadee UI',Tahoma,sans-serif;
+  --f-head:'Taviraj','Sarabun',serif;
+  --f-deco:'Cinzel','Taviraj',serif;
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--f-th);color:#e7ebf7;font-size:15.5px;line-height:1.6;min-height:100vh;
+  background:
+    radial-gradient(1100px 650px at 55% -12%, rgba(52,94,200,.38), transparent 62%),
+    radial-gradient(800px 600px at 105% 105%, rgba(28,58,133,.45), transparent 60%),
+    linear-gradient(180deg,#0a1738 0%,#060e26 55%,#040a1c 100%);
+  background-attachment:fixed}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+::selection{background:rgba(212,167,60,.35)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
-// ว่างไว้ = ใช้ Google Sheet ที่ผูกกับสคริปต์นี้
-// ถ้าสคริปต์ไม่ได้ผูกกับชีต ระบบจะสร้างชีตใหม่ชื่อ "Action Plan หน่วยไตเทียม" ให้เอง
-const SPREADSHEET_ID = '';
-const TZ = 'Asia/Bangkok';
-const MONTHS = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
+/* ---------- stars ---------- */
+#stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+#stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff6d8;opacity:.0;animation:twinkleStar var(--t,4s) ease-in-out infinite;animation-delay:var(--d,0s);box-shadow:0 0 6px rgba(255,236,180,.8)}
+@keyframes twinkleStar{0%,100%{opacity:0;transform:scale(.6)}50%{opacity:var(--o,.7);transform:scale(1)}}
 
-const SHEETS = {
-  settings: {
-    name: 'ตั้งค่า',
-    headers: ['คีย์', 'ค่า', 'คำอธิบาย'],
-    widths: [140, 320, 320]
-  },
-  strategies: {
-    name: 'ยุทธศาสตร์',
-    headers: ['ลำดับ', 'ชื่อยุทธศาสตร์'],
-    widths: [70, 620]
-  },
-  staff: {
-    name: 'บุคลากร',
-    headers: ['ลำดับ', 'ชื่อ', 'ตำแหน่ง'],
-    widths: [70, 180, 360]
-  },
-  projects: {
-    name: 'แผนงาน',
-    headers: ['รหัสแผนงาน', 'ยุทธศาสตร์ที่', 'ลำดับ', 'เป้าประสงค์/โครงการ', 'ผลผลิต/ตัวชี้วัด', 'งบประมาณ', 'ผู้รับผิดชอบ', 'วันที่บันทึก', 'วันที่แก้ไข'],
-    widths: [120, 90, 60, 340, 420, 120, 170, 130, 130],
-    wrap: true
-  },
-  activities: {
-    name: 'กิจกรรม',
-    headers: ['รหัสกิจกรรม', 'รหัสแผนงาน', 'ลำดับ', 'กิจกรรม'].concat(MONTHS),
-    widths: [120, 120, 60, 420].concat(MONTHS.map(function () { return 46; })),
-    wrap: true,
-    centerFrom: 5
-  }
+/* ---------- icons ---------- */
+.ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none;overflow:visible}
+.ico .fill{fill:currentColor;stroke:none}
+.ico .spin,.ico .spin-rev,.ico .pulse,.ico .twinkle,.ico .lid,.ico .wave{transform-box:fill-box;transform-origin:center}
+.ico .spin{animation:spin 10s linear infinite}
+.ico .spin-rev{animation:spin 7s linear infinite reverse}
+.ico .bounce{animation:bounceY 1.8s var(--ease) infinite}
+.ico .bob{animation:bob 2.8s ease-in-out infinite}
+.ico .pulse{animation:pulseRing 2.2s ease-out infinite}
+.ico .twinkle{animation:twinkle 2.6s ease-in-out infinite}
+.ico .bub{animation:bubble 2.4s ease-in infinite}
+.ico .bub.b2{animation-delay:.9s}
+.ico .ecg{stroke-dasharray:1;stroke-dashoffset:1;animation:ecg 2.6s linear infinite}
+.ico .draw{stroke-dasharray:1;stroke-dashoffset:0;animation:drawLoop 3.6s ease-in-out infinite}
+.ico .grow{stroke-dasharray:1;animation:drawLoop 3s ease-in-out infinite}
+.ico .wave{transform-origin:left center;animation:wave 2.6s ease-in-out infinite}
+.ico .lid{transform-origin:15% 100%;transition:transform .3s var(--ease)}
+button:hover .ico .lid{transform:rotate(-22deg) translate(-1px,-1px)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bounceY{0%,100%{transform:translateY(-1.5px)}50%{transform:translateY(1.8px)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.6px)}}
+@keyframes pulseRing{0%{transform:scale(.55);opacity:1}80%,100%{transform:scale(1.25);opacity:0}}
+@keyframes twinkle{0%,100%{transform:scale(.75) rotate(0);opacity:.7}50%{transform:scale(1.12) rotate(36deg);opacity:1}}
+@keyframes bubble{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(-7px);opacity:0}}
+@keyframes ecg{to{stroke-dashoffset:-1}}
+@keyframes drawLoop{0%{stroke-dashoffset:1}35%,100%{stroke-dashoffset:0}}
+@keyframes wave{0%,100%{transform:skewY(0)}50%{transform:skewY(-6deg)}}
+
+/* ---------- ornaments ---------- */
+.orn-strokes{stroke:var(--orn,url(#gGold));stroke-width:2.3}
+.orn-fills{fill:var(--orn,url(#gGold))}
+.orn-hole{fill:var(--orn-hole,#0a1838)}
+.orn-strokes path{stroke-dasharray:1;animation:ornDraw 2.4s var(--ease) both}
+@keyframes ornDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.dark-orn{--orn:url(#gGoldDark);--orn-hole:#fbf6ea}
+.frame{position:relative;border:1px solid var(--line);border-radius:8px;
+  background:linear-gradient(180deg,rgba(24,50,116,.55),rgba(9,20,50,.82));
+  box-shadow:inset 0 0 0 5px rgba(8,18,46,.75),inset 0 0 0 6px rgba(212,167,60,.22),0 22px 40px -24px rgba(0,0,0,.9)}
+.frame>.corner,.paper>.corner,.stage>.corner{position:absolute;width:var(--cs,74px);height:var(--cs,74px);pointer-events:none;z-index:2;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.55))}
+.corner.tl{left:-7px;top:-7px}
+.corner.tr{right:-7px;top:-7px;transform:scaleX(-1)}
+.corner.bl{left:-7px;bottom:-7px;transform:scaleY(-1)}
+.corner.br{right:-7px;bottom:-7px;transform:scale(-1,-1)}
+.paper>.corner{filter:none}
+.divider{display:flex;align-items:center;gap:10px;justify-content:center;margin:6px auto 0;max-width:520px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold))}
+.divider::after{background:linear-gradient(90deg,var(--gold),transparent)}
+.divider svg{width:min(260px,62vw);height:auto;flex:none}
+.dark-orn.divider::before{background:linear-gradient(90deg,transparent,var(--gold-d))}
+.dark-orn.divider::after{background:linear-gradient(90deg,var(--gold-d),transparent)}
+
+/* ---------- gold text ---------- */
+.gold-text{background:linear-gradient(100deg,#fff4cf 0%,#f1d68a 22%,#c99a35 40%,#fff1bf 52%,#d8ab45 68%,#f6df9c 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:goldShift 7s ease-in-out infinite}
+@keyframes goldShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.deco{font-family:var(--f-deco);letter-spacing:.28em;text-transform:uppercase}
+
+/* ---------- layout ---------- */
+.sidebar{position:fixed;inset:0 auto 0 0;width:var(--side);z-index:60;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#0c1b44 0%,#081331 55%,#060e27 100%);border-right:1px solid var(--line);
+  box-shadow:10px 0 34px -14px rgba(0,0,0,.9);transition:transform .45s var(--ease)}
+.sidebar::after{content:'';position:absolute;top:0;bottom:0;right:5px;width:1px;background:linear-gradient(transparent,rgba(212,167,60,.35),transparent)}
+.side-scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#24407f transparent}
+.brand{position:relative;margin:16px 16px 10px;padding:18px 12px 14px;text-align:center;--cs:54px}
+.brand .emblem{width:86px;height:86px;display:block;margin:0 auto 6px}
+.brand .b-kicker{font-family:var(--f-deco);font-size:13px;letter-spacing:.36em;color:var(--gold-l);margin:2px 0 0}
+.brand .b-title{font-family:var(--f-head);font-weight:700;font-size:19px;margin:2px 0 0;line-height:1.35}
+.brand .b-sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+.nav-label{font-family:var(--f-deco);font-size:10px;letter-spacing:.3em;color:var(--gold-d);margin:16px 26px 6px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:9px 12px;margin:3px 12px;border-radius:12px;color:#cdd5ef;text-decoration:none;position:relative;overflow:hidden;cursor:pointer;border:0;background:none;width:calc(100% - 24px);text-align:left;transition:background .3s,color .3s}
+.nav-item::after{content:'';position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,236,180,.12),transparent);transform:skewX(-18deg);transition:left .6s var(--ease)}
+.nav-item:hover::after{left:120%}
+.nav-item:hover{background:rgba(212,167,60,.07);color:#fff}
+.nav-ico{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);flex:none;
+  background:radial-gradient(circle at 32% 28%,#1f3f8f,#0a1838 72%);color:var(--gold-l);transition:box-shadow .3s,border-color .3s}
+.nav-ico .ico{width:21px;height:21px}
+.nav-item .lbl{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.nav-item .lbl b{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-item .lbl small{font-family:var(--f-deco);font-size:9.5px;letter-spacing:.22em;color:var(--muted);text-transform:uppercase}
+.nav-item.active{background:linear-gradient(90deg,rgba(212,167,60,.24),rgba(212,167,60,.03));color:#fff}
+.nav-item.active::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:linear-gradient(var(--gold-xl),var(--gold))}
+.nav-item.active .nav-ico{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,167,60,.14),0 0 18px rgba(212,167,60,.4)}
+.nav-sub{margin:0 12px 4px 64px;display:flex;flex-direction:column;gap:2px}
+.nav-sub a{font-size:13.5px;color:var(--muted);text-decoration:none;padding:3px 8px;border-radius:8px;display:flex;gap:8px;align-items:baseline;min-width:0}
+.nav-sub a span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.nav-sub a b{font-family:var(--f-deco);color:var(--gold-d);font-size:11px}
+.nav-sub a:hover,.nav-sub a.active{color:var(--gold-l);background:rgba(212,167,60,.06)}
+.side-foot{padding:12px 14px 16px;border-top:1px solid var(--line-2)}
+.user-card{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line-2)}
+.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-head);font-weight:700;color:#1b1405;background:linear-gradient(160deg,#fff1c2,#d4a73c 60%,#a57a28);box-shadow:0 0 0 2px rgba(8,18,46,1),0 0 0 3px rgba(212,167,60,.5)}
+.user-card .u-name{font-weight:600;font-size:14.5px;line-height:1.2}
+.user-card .u-role{font-size:12px;color:var(--muted)}
+.conn{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-top:10px;padding:0 4px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted-2);box-shadow:0 0 0 3px rgba(255,255,255,.05);flex:none}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(67,211,158,.18),0 0 10px rgba(67,211,158,.6)}
+.dot.bad{background:var(--bad);box-shadow:0 0 0 3px rgba(255,123,123,.18)}
+.dot.busy{background:var(--warn);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.35}}
+
+.topbar{position:sticky;top:0;z-index:50;height:var(--top);margin-left:var(--side);display:flex;align-items:center;gap:12px;padding:0 22px;
+  background:rgba(6,14,38,.72);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);border-bottom:1px solid var(--line-2)}
+.topbar::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,rgba(212,167,60,.6),transparent)}
+.tb-title{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.tb-title small{font-family:var(--f-deco);font-size:10px;letter-spacing:.3em;color:var(--gold);text-transform:uppercase}
+.tb-title b{font-family:var(--f-head);font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-spacer{flex:1}
+.clock-pill{display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);color:var(--gold-l);font-variant-numeric:tabular-nums;background:rgba(212,167,60,.06);font-weight:500}
+.icon-btn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--gold-l);cursor:pointer;transition:all .25s;flex:none}
+.icon-btn:hover{background:rgba(212,167,60,.14);border-color:var(--gold);transform:translateY(-1px)}
+.icon-btn.spinning .ico{animation:spin 1s linear infinite}
+#menuBtn{display:none}
+.main{margin-left:var(--side);position:relative;z-index:1;padding:26px clamp(14px,3vw,34px) 90px;max-width:calc(1320px + var(--side));}
+.scrim{position:fixed;inset:0;background:rgba(2,6,20,.6);backdrop-filter:blur(2px);z-index:55;opacity:0;pointer-events:none;transition:opacity .35s}
+
+@media (max-width:1023px){
+  .sidebar{transform:translateX(-105%)}
+  body.nav-open .sidebar{transform:none}
+  body.nav-open .scrim{opacity:1;pointer-events:auto}
+  .topbar,.main{margin-left:0}
+  #menuBtn{display:grid}
+}
+@media (max-width:560px){
+  .topbar{padding:0 12px;gap:8px}
+  .clock-pill{display:none}
+  body{font-size:15px}
+}
+
+/* ---------- page head ---------- */
+.page-head{text-align:center;margin:6px 0 22px}
+.page-head .kicker{font-family:var(--f-deco);letter-spacing:.42em;color:var(--gold);font-size:clamp(12px,1.6vw,14px)}
+.page-head h2{font-family:var(--f-head);font-weight:700;font-size:clamp(24px,3.4vw,34px);margin:2px 0 0;line-height:1.3}
+.page-head p{color:var(--muted);margin:6px 0 0}
+
+/* ---------- reveal ---------- */
+.reveal{animation:rise .7s var(--ease) both;animation-delay:calc(var(--i,0) * 70ms)}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ---------- stage (hero) ---------- */
+.stage{position:relative;text-align:center;padding:22px 16px 26px;border-radius:20px;overflow:hidden;margin-bottom:22px;--cs:84px;
+  background:radial-gradient(60% 80% at 50% 0%,rgba(70,118,230,.38),transparent 70%),linear-gradient(180deg,#0f2357 0%,#0a1840 60%,#081333 100%)}
+.stage .beam{position:absolute;top:-40px;width:42%;height:120%;background:linear-gradient(180deg,rgba(255,240,200,.16),transparent 75%);filter:blur(6px);transform-origin:top center;pointer-events:none;animation:sway 9s ease-in-out infinite}
+.stage .beam.l{left:2%;clip-path:polygon(40% 0,60% 0,100% 100%,0 100%);transform:rotate(18deg)}
+.stage .beam.r{right:2%;clip-path:polygon(40% 0,60% 0,100% 100%,0 100%);transform:rotate(-18deg);animation-delay:-4.5s}
+@keyframes sway{0%,100%{opacity:.75}50%{opacity:.35}}
+.stage-top{display:flex;align-items:flex-end;justify-content:center;gap:clamp(10px,3vw,34px);position:relative;z-index:1}
+.lights{display:flex;gap:clamp(10px,2.6vw,26px);align-items:flex-start;height:72px}
+.lights i{display:block;width:4px;border-radius:4px;background:linear-gradient(#fffbe8,#e8c35c);box-shadow:0 0 10px 2px rgba(241,214,138,.75),0 0 26px rgba(241,214,138,.4);animation:flick 4s ease-in-out infinite}
+.lights i:nth-child(1){height:58px}.lights i:nth-child(2){height:40px;animation-delay:.6s}.lights i:nth-child(3){height:28px;animation-delay:1.2s}
+.lights.r{flex-direction:row-reverse}
+@keyframes flick{0%,100%{opacity:1}45%{opacity:.55}50%{opacity:.95}55%{opacity:.6}}
+.marquee{position:relative;width:clamp(150px,30vw,200px);aspect-ratio:1.55;border-radius:6px;display:grid;place-items:center;--cs:40px;
+  background:linear-gradient(180deg,#fffaf0,#f3e5c0);border:2px solid #e2bf68;box-shadow:0 0 0 4px rgba(10,24,64,1),0 0 0 5px rgba(212,167,60,.55),0 0 40px rgba(241,214,138,.35)}
+.marquee .emblem{width:62%;height:auto}
+.marquee .corner{width:40px;height:40px;position:absolute}
+.podium{width:min(560px,86%);height:46px;margin:-6px auto 0;border-radius:50%;position:relative;z-index:0;
+  background:radial-gradient(50% 60% at 50% 40%,#1b3576,#0b1940 70%);box-shadow:inset 0 2px 0 rgba(241,214,138,.25),0 18px 30px -12px rgba(0,0,0,.8)}
+.arc{display:block;width:min(820px,100%);height:26px;margin:4px auto 0}
+.arc path{stroke:url(#gGoldH);stroke-width:2.4;fill:none;stroke-dasharray:1;animation:ornDraw 2.2s var(--ease) both .3s}
+.clock{font-family:var(--f-deco);font-weight:600;font-size:clamp(17px,2.4vw,22px);color:var(--gold-l);font-variant-numeric:tabular-nums;margin:8px 0 6px;letter-spacing:.04em}
+.stage h1{font-family:var(--f-deco);font-weight:600;letter-spacing:.32em;font-size:clamp(22px,4.4vw,40px);margin:4px 0 0;line-height:1.2}
+.stage .th{font-family:var(--f-head);font-size:clamp(17px,2.4vw,22px);font-weight:600;margin-top:4px}
+.stage .org{color:var(--muted);font-size:14.5px}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:22px}
+@media (max-width:860px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{padding:18px 16px 16px;text-align:center;--cs:44px}
+.stat .s-ico{width:52px;height:52px;margin:0 auto 6px;border-radius:50%;display:grid;place-items:center;color:var(--gold-l);border:1px solid var(--line);
+  background:radial-gradient(circle at 30% 28%,#244a9e,#0b1a42 70%);box-shadow:0 0 0 4px rgba(212,167,60,.07),0 0 22px rgba(212,167,60,.18)}
+.stat .s-ico .ico{width:26px;height:26px}
+.stat .num{font-family:var(--f-deco);font-weight:700;font-size:clamp(28px,4vw,38px);line-height:1.1}
+.stat .lab{font-size:14px;color:#cfd6ee}
+.stat .en{font-family:var(--f-deco);font-size:9.5px;letter-spacing:.26em;color:var(--muted);text-transform:uppercase}
+
+/* ---------- now showing ---------- */
+.nowshow{padding:20px clamp(14px,2.6vw,26px) 18px;margin-bottom:26px}
+.sec-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sec-title .badge{font-family:var(--f-deco);font-size:11px;letter-spacing:.24em;color:#14204a;padding:5px 14px;border-radius:999px;background:linear-gradient(180deg,#fbe8ad,#d4a73c);box-shadow:0 0 18px rgba(212,167,60,.35)}
+.sec-title h3{margin:0;font-family:var(--f-head);font-size:20px;font-weight:700}
+.now-list{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr))}
+.now-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid var(--line-2);text-decoration:none;transition:border-color .3s,background .3s}
+.now-item:hover{border-color:var(--line);background:rgba(212,167,60,.06)}
+.now-item .tag{font-family:var(--f-deco);font-weight:700;font-size:13px;color:var(--gold-l);min-width:38px;height:38px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--line);background:rgba(212,167,60,.08)}
+.now-item.hidden{display:none}
+.now-item .t2{font-size:13px;color:var(--gold-l);line-height:1.45;opacity:.9}
+.now-item .t1{margin:4px 0 0;padding-left:18px;font-size:14.5px;line-height:1.5}
+.now-item .t1 li::marker{color:var(--gold)}
+.sec-count{margin-left:auto;font-size:13px;color:var(--muted)}
+.empty{padding:16px;color:var(--muted);text-align:center}
+
+/* ---------- tickets ---------- */
+.tickets{display:grid;gap:20px;grid-template-columns:1fr}
+@media (min-width:1180px){.tickets{grid-template-columns:1fr 1fr}}
+.t-wrap{filter:drop-shadow(0 16px 22px rgba(0,0,0,.45));transition:transform .4s var(--ease),filter .4s}
+.t-wrap:hover{transform:translateY(-4px) scale(1.01);filter:drop-shadow(0 22px 26px rgba(0,0,0,.55)) drop-shadow(0 0 14px rgba(241,214,138,.25))}
+.t-wrap.hot{filter:drop-shadow(0 16px 22px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(241,214,138,.35))}
+.ticket{--stub:124px;position:relative;display:grid;grid-template-columns:var(--stub) 1fr;min-height:158px;border-radius:20px;background:var(--cream);color:var(--ink);text-decoration:none;
+  -webkit-mask:radial-gradient(circle at var(--stub) 0,transparent 14px,#000 14.5px) top/100% 51% no-repeat,radial-gradient(circle at var(--stub) 100%,transparent 14px,#000 14.5px) bottom/100% 51% no-repeat;
+  mask:radial-gradient(circle at var(--stub) 0,transparent 14px,#000 14.5px) top/100% 51% no-repeat,radial-gradient(circle at var(--stub) 100%,transparent 14px,#000 14.5px) bottom/100% 51% no-repeat}
+.ticket.hot{box-shadow:inset 0 0 26px rgba(217,178,87,.28)}
+.ticket.glow-run{--c1:#d59a26;--c2:#2d8fe0}
+.ticket.glow-run::before{padding:2.4px;filter:drop-shadow(0 0 3px var(--c1))}
+.ticket .stub{background:linear-gradient(165deg,#f8ecc8 0%,#ecd598 70%,#e3c47c 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative;border-radius:20px 0 0 20px}
+.ticket .stub::after{content:'';position:absolute;inset:8px;border:1px solid rgba(156,112,35,.35);border-radius:14px 4px 4px 14px;pointer-events:none}
+.stub-lbl{font-family:var(--f-deco);letter-spacing:.3em;font-size:11px;color:#8c6420;padding-left:.3em}
+.stub-no{font-family:var(--f-deco);font-weight:700;font-size:48px;line-height:1;color:var(--ink)}
+.ticket .perf{position:absolute;left:var(--stub);top:16px;bottom:16px;border-left:2px dashed rgba(156,112,35,.5)}
+.ticket .tb{padding:18px 20px 18px 24px;position:relative;min-width:0}
+.t-kicker{font-family:var(--f-deco);letter-spacing:.2em;font-size:11.5px;color:#6d6488;line-height:1.5;padding-right:48px}
+.t-kicker b{font-family:var(--f-th);letter-spacing:.06em;font-weight:600}
+.t-title{font-family:var(--f-head);font-weight:700;font-size:clamp(17px,1.9vw,20px);line-height:1.4;margin:4px 0 6px;color:#0f1a40;padding-right:44px}
+.t-meta{color:#68708f;font-size:14px}
+.t-meta b{color:#1c2a5c}
+.t-ico{position:absolute;right:16px;top:16px;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#7d5a17;background:radial-gradient(circle at 30% 30%,#fff8e0,#efd99b);border:1px solid rgba(156,112,35,.4)}
+.t-ico .ico{width:23px;height:23px}
+.pill{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 16px;border-radius:999px;background:linear-gradient(180deg,#142a63,#0b1a44);color:var(--gold-l);font-family:var(--f-deco);font-size:11.5px;letter-spacing:.2em;box-shadow:0 4px 12px -4px rgba(11,26,68,.6)}
+.pill b{font-family:var(--f-th);letter-spacing:.04em;font-weight:600}
+.pill .live{width:7px;height:7px;border-radius:50%;background:#5ff0b5;box-shadow:0 0 8px #5ff0b5;animation:blink 1.4s infinite}
+.stamp{position:absolute;right:14px;bottom:12px;transform:rotate(-9deg);font-family:var(--f-deco);font-weight:700;letter-spacing:.18em;font-size:13px;color:#b23a3a;border:2px solid #b23a3a;border-radius:6px;padding:2px 10px;opacity:.85}
+@media (max-width:520px){
+  .ticket{--stub:96px;min-height:146px}
+  .stub-no{font-size:38px}
+  .stub-lbl{font-size:9.5px}
+  .ticket .tb{padding:14px 14px 14px 18px}
+  .t-ico{display:none}.t-title,.t-kicker{padding-right:0}
+  .pill .pen{display:none}
+  .pill{padding:6px 14px}
+}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:12px;border:1px solid transparent;cursor:pointer;font-weight:600;font-size:15px;line-height:1.2;position:relative;overflow:hidden;transition:transform .2s,box-shadow .3s,background .3s;text-decoration:none;white-space:nowrap}
+.btn .ico{width:19px;height:19px}
+.btn:active{transform:translateY(1px)}
+.btn[disabled]{opacity:.6;cursor:progress}
+.btn-gold{color:#1d1505;background:linear-gradient(180deg,#fbe9ae 0%,#e3bd5c 48%,#c39232 100%);border-color:#f7dc94;box-shadow:0 8px 20px -10px rgba(212,167,60,.8),inset 0 1px 0 rgba(255,255,255,.6)}
+.btn-gold::after{content:'';position:absolute;top:0;bottom:0;left:-70%;width:45%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-20deg);animation:shine 4.5s ease-in-out infinite}
+@keyframes shine{0%,60%{left:-70%}100%{left:130%}}
+.btn-gold:hover{box-shadow:0 10px 26px -8px rgba(212,167,60,.95),inset 0 1px 0 rgba(255,255,255,.6)}
+.btn-ghost{color:var(--gold-l);border-color:var(--line);background:rgba(212,167,60,.05)}
+.btn-ghost:hover{background:rgba(212,167,60,.14);border-color:var(--gold)}
+.btn-navy{color:var(--gold-l);background:linear-gradient(180deg,#183273,#0c1b46);border-color:#2a4790}
+.btn-navy:hover{box-shadow:0 8px 20px -10px rgba(12,27,70,.9)}
+.btn-line{color:var(--ink);border-color:#d6bf86;background:#fffaf0}
+.btn-line:hover{background:#fff3d6}
+.btn-danger{color:#fff;background:linear-gradient(180deg,#d65a5a,#a83333);border-color:#e98a8a}
+.btn-sm{padding:7px 12px;font-size:14px;border-radius:10px}
+.btn .spinner{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+
+/* ---------- plans ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+.chip{padding:7px 14px;border-radius:999px;border:1px solid var(--line-2);background:rgba(255,255,255,.03);color:#cfd6ee;cursor:pointer;font-size:14px;transition:all .25s;display:inline-flex;gap:6px;align-items:center}
+.chip b{font-family:var(--f-deco);font-size:12px;color:var(--gold)}
+.chip:hover{border-color:var(--line)}
+.chip.on{background:linear-gradient(180deg,#fbe8ad,#d4a73c);color:#1a1405;border-color:#f5d98e}
+.chip.on b{color:#1a1405}
+.search{display:flex;align-items:center;gap:8px;padding:0 12px;height:42px;border-radius:12px;border:1px solid var(--line-2);background:rgba(255,255,255,.04);min-width:min(100%,260px);flex:0 1 300px}
+.search input{border:0;outline:0;background:none;flex:1;min-width:0;color:#fff}
+.search input::placeholder{color:var(--muted)}
+.search:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,167,60,.15)}
+.group{margin:8px 0 30px}
+.group-head{display:flex;align-items:center;gap:14px;margin:0 0 14px}
+.g-no{flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;text-align:center;line-height:1;color:#1a1405;font-family:var(--f-deco);font-weight:700;font-size:21px;
+  background:radial-gradient(circle at 30% 25%,#fff3c8,#d9ad48 60%,#a97c27);box-shadow:0 0 0 3px #0a1838,0 0 0 4px rgba(212,167,60,.6),0 0 20px rgba(212,167,60,.35)}
+.g-no small{display:block;font-size:7px;letter-spacing:.2em;font-weight:600}
+.g-txt{min-width:0}
+.g-txt .k{font-family:var(--f-deco);letter-spacing:.24em;font-size:11px;color:var(--gold)}
+.g-txt h3{margin:0;font-family:var(--f-head);font-weight:700;font-size:clamp(17px,2vw,21px);line-height:1.4}
+.g-line{flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent);min-width:20px;align-self:center}
+.plan-grid{display:grid;gap:22px;grid-template-columns:1fr}
+@media (min-width:1500px){.plan-grid{grid-template-columns:1fr 1fr}}
+.plan{padding:20px clamp(14px,2.4vw,24px) 16px;--cs:62px}
+.plan-head{display:flex;gap:12px;align-items:flex-start}
+.plan-no{flex:none;font-family:var(--f-deco);font-weight:700;color:var(--gold-l);font-size:13px;letter-spacing:.12em;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:rgba(212,167,60,.08);line-height:1.2;text-align:center}
+.plan-no small{display:block;font-size:8.5px;letter-spacing:.24em;color:var(--muted)}
+.plan-head h4{margin:0;flex:1;font-family:var(--f-head);font-weight:700;font-size:clamp(16px,1.8vw,18.5px);line-height:1.5}
+.plan-actions{display:flex;gap:6px;flex:none}
+.plan-actions .icon-btn{width:36px;height:36px}
+.plan-actions .icon-btn .ico{width:19px;height:19px}
+.icon-btn.del:hover{border-color:#e98a8a;color:#ffb4b4;background:rgba(214,90,90,.15)}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.meta span{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;padding:4px 11px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--line-2);color:#d6dcf2}
+.meta .ico{width:16px;height:16px;color:var(--gold-l)}
+.sub-h{display:flex;align-items:center;gap:10px;margin:14px 0 8px;font-family:var(--f-deco);font-size:10.5px;letter-spacing:.26em;color:var(--gold)}
+.sub-h b{font-family:var(--f-th);letter-spacing:.02em;font-size:14px;color:#e7ebf7;font-weight:600}
+.sub-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+.gantt{--mw:25px;display:grid;gap:6px}
+.g-row{display:grid;grid-template-columns:minmax(0,1fr) calc(var(--mw) * 12);gap:12px;align-items:center}
+.g-row .a-txt{font-size:14.5px;line-height:1.5;display:flex;gap:8px}
+.g-row .a-txt i{font-style:normal;color:var(--gold);font-family:var(--f-deco);font-weight:700;font-size:12.5px;min-width:18px;padding-top:2px}
+.months{display:grid;grid-template-columns:repeat(12,1fr);position:relative;height:24px;border-radius:7px;background:rgba(255,255,255,.035);border:1px solid rgba(212,167,60,.12)}
+.months .mc{grid-row:1;border-left:1px solid rgba(212,167,60,.08)}
+.months .mc:first-child{border-left:0}
+.months .mc.now{background:rgba(95,240,181,.08);box-shadow:inset 0 0 0 1px rgba(95,240,181,.25)}
+.months .bar{grid-row:1;position:relative;align-self:center;height:8px;margin:0 6px;border-radius:2px;background:linear-gradient(90deg,#f8e3a3,#d4a73c);box-shadow:0 0 10px rgba(241,214,138,.45);transform-origin:left center;animation:barIn .9s var(--ease) both;animation-delay:calc(var(--i,0)*60ms + 200ms)}
+.months .bar::before,.months .bar::after{content:'';position:absolute;top:50%;width:0;height:0;border:5px solid transparent;transform:translateY(-50%)}
+.months .bar::before{left:-5px;border-right:5px solid #f3d98c;border-left:0}
+.months .bar::after{right:-5px;border-left:5px solid #d4a73c;border-right:0}
+@keyframes barIn{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+.months.mhead{height:auto;background:none;border:0}
+.mhead .mc{border:0;font-size:10.5px;color:var(--muted);text-align:center;line-height:1.3}
+.mhead .mc.now{color:#5ff0b5;background:none;box-shadow:none;font-weight:700}
+.kpis{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.kpis li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px;line-height:1.5}
+.kpis .ico{width:18px;height:18px;color:var(--gold-l);margin-top:3px}
+.plan-foot{margin-top:12px;font-size:12px;color:var(--muted);text-align:right}
+@media (max-width:600px){
+  .group-head{flex-wrap:wrap;gap:10px}
+  .g-line{display:none}
+  .g-no{width:50px;height:50px;font-size:18px}
+  .g-txt{flex:1;min-width:calc(100% - 64px)}
+  .group-head .btn{margin-left:auto}
+}
+@media (max-width:760px){
+  .g-row{grid-template-columns:1fr;gap:4px}
+  .gantt .g-row.hdr>span:first-child{display:none}
+  .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .chip{flex:none}
+  .g-row .months{height:20px}
+  .gantt{gap:10px}
+  .plan-head{flex-wrap:wrap}
+  .plan-head h4{order:3;flex-basis:100%}
+  .plan-actions{margin-left:auto}
+}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:45;width:60px;height:60px;border-radius:50%;display:none;place-items:center;border:1px solid #f7dc94;cursor:pointer;
+  background:radial-gradient(circle at 30% 25%,#fff3c8,#d9ad48 60%,#a97c27);color:#1a1405;box-shadow:0 0 0 4px rgba(10,24,64,.9),0 0 0 5px rgba(212,167,60,.6),0 12px 28px rgba(0,0,0,.6)}
+.fab .ico{width:28px;height:28px;stroke-width:2}
+@media (max-width:1023px){.fab.show{display:grid}}
+
+/* ---------- paper / document table ---------- */
+.paper{position:relative;background:linear-gradient(180deg,#fffdf6,#fbf4e2);color:var(--ink);border-radius:8px;padding:28px clamp(12px,2.4vw,30px) 26px;--cs:70px;
+  box-shadow:0 0 0 1px #e3c97f,0 0 0 6px #0b1a44,0 0 0 7px rgba(212,167,60,.55),0 30px 60px -30px rgba(0,0,0,.9)}
+.doc-title{text-align:center;margin-bottom:12px}
+.doc-title h3{margin:0;font-family:var(--f-th);font-weight:700;font-size:clamp(16px,2vw,19px)}
+.doc-title p{margin:0;font-weight:700;font-size:clamp(14px,1.7vw,16px)}
+.doc-scroll{overflow:auto;border:1px solid #cdb67c;border-radius:4px;max-height:none;-webkit-overflow-scrolling:touch}
+table.doc{border-collapse:collapse;width:100%;min-width:1120px;font-size:13.5px;line-height:1.45}
+table.doc th,table.doc td{border:1px solid #b9a777;padding:5px 7px;vertical-align:top}
+table.doc thead th{background:#e9eef8;color:#0d1d47;font-weight:700;text-align:center;vertical-align:middle}
+table.doc thead tr:nth-child(2) th{font-size:12px;padding:3px 0;min-width:34px}
+table.doc .s-row td{background:#f6ecd0;font-weight:700;color:#0d1d47}
+table.doc td.m{padding:0;position:relative;min-width:34px}
+table.doc td.m.on{background:rgba(212,167,60,.2)}
+table.doc td.m .ln{position:absolute;left:0;right:0;top:14px;height:1.6px;background:#14204a}
+table.doc td.m.st .ln{left:5px}
+table.doc td.m.en .ln{right:5px}
+table.doc td.m .ah{position:absolute;top:10.3px;width:0;height:0;border-top:4.5px solid transparent;border-bottom:4.5px solid transparent}
+table.doc td.m .ah.l{left:0;border-right:6px solid #14204a}
+table.doc td.m .ah.r{right:0;border-left:6px solid #14204a}
+table.doc .num{white-space:nowrap}
+table.doc td.kpi div+div{margin-top:3px}
+.doc-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:0 0 18px}
+
+/* ---------- settings ---------- */
+.set-grid{display:grid;gap:22px;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:1100px){.set-grid{grid-template-columns:1fr}}
+.panel{padding:22px clamp(14px,2.4vw,24px) 20px;--cs:58px}
+.panel h3{margin:0 0 2px;font-family:var(--f-head);font-size:20px;font-weight:700;display:flex;gap:10px;align-items:center}
+.panel h3 .ico{color:var(--gold-l)}
+.panel .hint{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:13.5px;color:#cbd3ee;font-weight:500}
+.inp{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line-2);background:rgba(255,255,255,.05);color:#fff;outline:0;transition:border-color .2s,box-shadow .2s}
+.inp:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,167,60,.15)}
+textarea.inp{resize:vertical;min-height:44px;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.row2{grid-template-columns:1fr}}
+.list-ed{display:grid;gap:8px;margin-bottom:12px}
+.le-row{display:grid;grid-template-columns:52px 1fr 36px;gap:8px;align-items:start}
+.le-row.staff{grid-template-columns:1fr 1.4fr 36px}
+.le-row .icon-btn{width:36px;height:40px;border-radius:10px}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.url-box{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+
+/* ---------- modal ---------- */
+.modal-wrap{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(2,6,20,.66);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);animation:fadeIn .25s both}
+.modal-wrap.out{animation:fadeOut .22s both}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes fadeOut{to{opacity:0}}
+.modal{position:relative;width:min(980px,100%);max-height:calc(100vh - 36px);max-height:calc(100dvh - 36px);display:flex;flex-direction:column;border-radius:10px;color:var(--ink);--cs:70px;
+  background:linear-gradient(180deg,#fffdf6,#f8efd8);box-shadow:0 0 0 1px #e3c97f,0 0 0 6px #0b1a44,0 0 0 7px rgba(212,167,60,.6),0 40px 80px -20px rgba(0,0,0,.9);animation:pop .35s var(--ease) both}
+.modal.sm{width:min(480px,100%)}
+.modal.glow-run{--c1:#d29a2a;--c2:#3a8ee0}
+.modal.glow-run::before{z-index:4}
+@keyframes pop{from{transform:translateY(18px) scale(.97);opacity:0}}
+.modal>.corner{position:absolute;width:var(--cs);height:var(--cs);pointer-events:none;z-index:3}
+.m-head{padding:22px 26px 6px;text-align:center}
+.m-head .deco{font-size:11px;color:var(--gold-d)}
+.m-head h3{margin:2px 0 0;font-family:var(--f-head);font-weight:700;font-size:22px;color:#0f1a40}
+.m-body{padding:10px 26px 10px;overflow-y:auto;flex:1;overscroll-behavior:contain}
+.m-foot{padding:12px 26px 20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid #ead9ab}
+.modal .field label{color:#3a4572;font-weight:600}
+.modal .inp{background:#fffefa;border-color:#dcc58e;color:var(--ink)}
+.modal .inp:focus{border-color:#c39232;box-shadow:0 0 0 3px rgba(212,167,60,.25)}
+.modal select.inp{appearance:auto}
+.ed-grid{display:grid;grid-template-columns:1fr 120px;gap:12px}
+.act-ed{border:1px solid #e4cf96;border-radius:12px;padding:10px 12px 12px;background:#fffbf0;margin-bottom:10px;position:relative}
+.act-top{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:start}
+.act-no{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-deco);font-weight:700;font-size:13px;color:var(--gold-l);background:linear-gradient(180deg,#183273,#0c1b46);margin-top:4px}
+.act-tools{display:flex;gap:4px}
+.mini{width:32px;height:32px;border-radius:9px;border:1px solid #dcc58e;background:#fff;display:grid;place-items:center;cursor:pointer;color:#5a4a1f}
+.mini:hover{background:#fff1cc}
+.mini .ico{width:16px;height:16px}
+.mini.del:hover{background:#ffe1e1;color:#a83333;border-color:#e9a0a0}
+.mchips{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-top:8px}
+.mchip{padding:6px 0;border-radius:8px;border:1px solid #dcc58e;background:#fff;font-size:12.5px;cursor:pointer;color:#3a4572;transition:all .15s;user-select:none}
+.mchip.on{background:linear-gradient(180deg,#183273,#0c1b46);border-color:#0c1b46;color:var(--gold-l);box-shadow:0 3px 8px -3px rgba(12,27,70,.6)}
+.mquick{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.mquick button{font-size:12px;padding:3px 10px;border-radius:999px;border:1px dashed #cdb37a;background:none;color:#6e5a26;cursor:pointer}
+.mquick button:hover{background:#fff3d6}
+@media (max-width:640px){
+  .modal-wrap{padding:0;align-items:stretch}
+  .modal{max-height:100vh;max-height:100dvh;border-radius:0;width:100%}
+  .m-head{padding:18px 16px 4px}.m-body{padding:8px 14px}.m-foot{padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+  .mchips{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .ed-grid{grid-template-columns:1fr 90px}
+}
+.resp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.rchip{padding:6px 12px;border-radius:999px;border:1px solid #dcc58e;background:#fff;cursor:pointer;font-size:14px;color:#3a4572;display:inline-flex;gap:6px;align-items:center}
+.rchip.on{background:linear-gradient(180deg,#fbe8ad,#d9ad48);border-color:#c39232;color:#1a1405;font-weight:600}
+.err{color:#b23a3a;font-size:13px;margin-top:4px}
+.pdf-pages{display:grid;gap:14px}
+.pdf-pages img{width:100%;border-radius:4px;box-shadow:0 0 0 1px #d9c38d,0 10px 22px -12px rgba(0,0,0,.45);background:#fff}
+.pdf-pages .pg{font-size:12px;color:#6b7394;text-align:center;margin-top:-8px}
+
+/* ---------- toast / loader ---------- */
+#toasts{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(92vw,460px);pointer-events:none}
+.toast{display:flex;gap:10px;align-items:center;padding:12px 18px;border-radius:14px;background:linear-gradient(180deg,#132a66,#0a1840);border:1px solid var(--line);color:#fff;box-shadow:0 18px 40px -16px rgba(0,0,0,.9);animation:toastIn .4s var(--ease) both;pointer-events:auto;font-size:14.5px}
+.toast .ico{color:var(--gold-l)}
+.toast.bad{border-color:rgba(255,123,123,.6)}.toast.bad .ico{color:var(--bad)}
+.toast.out{animation:toastOut .35s both}
+@keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.96)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(10px)}}
+#loader{position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:radial-gradient(60% 50% at 50% 45%,#13296a,#050b1f 75%);transition:opacity .6s}
+#loader.hide{opacity:0;pointer-events:none}
+.ld{text-align:center}
+.ld .emblem{width:120px;height:120px;filter:drop-shadow(0 0 22px rgba(241,214,138,.35))}
+.ld .ring{animation:spin 6s linear infinite;transform-origin:50px 50px}
+.ld p{color:var(--gold-l);font-family:var(--f-deco);letter-spacing:.34em;font-size:13px;margin:16px 0 2px}
+.ld small{color:var(--muted)}
+.banner{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,123,123,.45);background:rgba(120,30,30,.25);margin-bottom:18px;font-size:14.5px}
+.banner .ico{color:var(--bad);margin-top:2px}
+.banner b{display:block}
+
+.em-ring{transform-origin:50px 50px;animation:spin 40s linear infinite}
+.em-pulse{transform-origin:50px 52px;animation:emPulse 2.6s ease-out infinite}
+@keyframes emPulse{0%{transform:scale(.7);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+.em-drop{animation:dropFall 2.6s ease-in infinite}
+@keyframes dropFall{0%{transform:translateY(-4px);opacity:0}25%{opacity:1}75%{transform:translateY(1px);opacity:1}100%{transform:translateY(3px);opacity:0}}
+
+
+/* ---------- 3D scene / glow / unfold / tilt ---------- */
+#snow{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+.kidney-wrap{position:relative;width:min(460px,64vw);height:clamp(270px,31vw,390px);flex:none;display:grid;place-items:center}
+.kidney-host{position:absolute;inset:0;z-index:2}
+.kidney-cv{width:100%;height:100%;display:block;cursor:grab;touch-action:pan-y;outline:none}
+.kidney-cv.grab{cursor:grabbing}
+.k-fallback{width:60%;height:auto;margin:auto;position:absolute;inset:0}
+.k-glow{position:absolute;left:50%;top:48%;width:70%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;z-index:1;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(220,30,60,.30),rgba(220,30,60,.10) 55%,transparent);filter:blur(6px);animation:kPulse 3.6s ease-in-out infinite}
+@keyframes kPulse{0%,100%{opacity:.75;transform:translate(-50%,-50%) scale(.95)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}}
+.k-base{position:absolute;left:50%;bottom:2%;width:64%;height:13%;transform:translateX(-50%);border-radius:50%;z-index:0;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(241,214,138,.28),rgba(241,214,138,.06) 60%,transparent);box-shadow:0 0 0 1px rgba(241,214,138,.25) inset}
+.k-base::after{content:'';position:absolute;inset:18% 14%;border-radius:50%;border:1px solid rgba(241,214,138,.35);animation:kRing 3.6s ease-out infinite}
+@keyframes kRing{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+.k-hint{font-size:12.5px;color:var(--muted);margin-top:2px}
+@property --ang{syntax:'<angle>';initial-value:0deg;inherits:false}
+.glow-run{--c1:#ffd977;--c2:#6fd8ff}
+.glow-run::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.6px;pointer-events:none;z-index:3;
+  background:conic-gradient(from var(--ang),transparent 0deg 40deg,var(--c1) 80deg,transparent 112deg 220deg,var(--c2) 262deg,transparent 292deg 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  filter:drop-shadow(0 0 4px var(--c1)) drop-shadow(0 0 7px rgba(111,216,255,.5));animation:runAng 6.5s linear infinite}
+.glow-run.slow::before{animation-duration:10s}
+.glow-hover::before{opacity:0;transition:opacity .45s}
+.glow-hover:hover::before,.glow-hover:focus-within::before{opacity:1}
+@keyframes runAng{to{--ang:360deg}}
+.unfold{opacity:0;scale:.94 .16;transform-origin:50% 0;transition:opacity .55s ease,scale .95s cubic-bezier(.2,.9,.25,1.12);transition-delay:var(--ud,0s)}
+.unfold.in{opacity:1;scale:1 1}
+.tilt{transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .28s ease-out;transform-style:preserve-3d}
+.glare{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:4;opacity:0;transition:opacity .35s;
+  background:radial-gradient(circle at var(--gx,50%) var(--gy,30%),rgba(255,255,255,.24),rgba(255,255,255,0) 52%)}
+.tilt:hover .glare{opacity:1}
+.ticket .glare{background:radial-gradient(circle at var(--gx,50%) var(--gy,30%),rgba(255,255,255,.6),rgba(255,255,255,0) 50%);mix-blend-mode:soft-light}
+@media (min-width:1024px){
+  .stat.frame,.nowshow.frame,.plan.frame,.panel.frame{background:linear-gradient(180deg,rgba(24,50,116,.40),rgba(9,20,50,.62));backdrop-filter:blur(10px) saturate(1.25);-webkit-backdrop-filter:blur(10px) saturate(1.25)}
+}
+.stage.hero3d{background:radial-gradient(55% 65% at 50% 32%,rgba(60,110,230,.22),transparent 72%),linear-gradient(180deg,rgba(15,35,87,.30),rgba(8,19,51,.10));padding-top:26px}
+.fx-anchor{width:min(560px,62vw);height:clamp(220px,30vw,330px);flex:none}
+.hero3d .lights{align-self:flex-start;margin-top:10px}
+.hero3d h1{filter:drop-shadow(0 0 14px rgba(241,214,138,.35))}
+.scroll-hint{display:inline-flex;flex-direction:column;align-items:center;gap:6px;margin-top:14px;font-size:12.5px;color:var(--muted)}
+.scroll-hint .mouse{width:22px;height:34px;border:1.6px solid var(--gold);border-radius:12px;position:relative}
+.scroll-hint .mouse::after{content:'';position:absolute;left:50%;top:6px;width:3px;height:7px;margin-left:-1.5px;border-radius:2px;background:var(--gold-l);animation:wheel 1.8s ease-in-out infinite}
+@keyframes wheel{0%{transform:translateY(0);opacity:1}70%{transform:translateY(11px);opacity:0}100%{opacity:0}}
+@media (max-width:560px){
+  .kidney-wrap{width:calc(100% - 64px);height:280px}
+  .hero3d .stage-top{gap:6px}
+  .hero3d .lights{gap:7px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  .unfold{opacity:1;scale:1 1}
+}
+@media print{body{background:#fff}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gGold" x1="0" y1="0" x2="140" y2="140" gradientUnits="userSpaceOnUse" spreadMethod="reflect">
+      <stop offset="0" stop-color="#fff3c6"/><stop offset=".3" stop-color="#ecc865"/><stop offset=".55" stop-color="#a97b26"/><stop offset=".8" stop-color="#f5dc93"/><stop offset="1" stop-color="#c79a3a"/>
+      <animateTransform attributeName="gradientTransform" type="translate" values="-140 -140;140 140;-140 -140" dur="9s" repeatCount="indefinite"/>
+    </linearGradient>
+    <linearGradient id="gGoldDark" x1="0" y1="0" x2="140" y2="140" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d9ae4e"/><stop offset=".45" stop-color="#9a7023"/><stop offset="1" stop-color="#c69737"/>
+    </linearGradient>
+    <linearGradient id="gGoldH" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c69737" stop-opacity="0"/><stop offset=".2" stop-color="#e9c467"/><stop offset=".5" stop-color="#fff0c0"/><stop offset=".8" stop-color="#e9c467"/><stop offset="1" stop-color="#c69737" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="gFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff3c8"/><stop offset=".45" stop-color="#e2b955"/><stop offset="1" stop-color="#a57a28"/>
+    </linearGradient>
+    <symbol id="orn-corner" viewBox="0 0 140 140"><g class="orn-strokes" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path pathLength="1" d="M14.0 10.0 C14.7 10.0 16.7 10.0 18.1 10.0 C19.5 10.0 20.8 10.0 22.2 10.0 C23.6 10.0 24.9 10.0 26.3 10.0 C27.7 10.0 29.0 10.0 30.4 10.0 C31.8 10.0 33.1 10.0 34.5 10.0 C35.9 10.0 37.2 10.0 38.6 10.0 C40.0 10.0 41.3 10.0 42.7 10.0 C44.1 10.0 45.4 10.0 46.8 10.0 C48.2 10.0 49.5 10.0 50.9 10.0 C52.3 10.0 53.6 10.0 55.0 10.0 C56.4 10.0 57.7 10.0 59.1 10.0 C60.5 10.0 61.8 10.0 63.2 10.0 C64.6 10.0 65.9 10.0 67.3 10.0 C68.7 10.0 70.0 10.0 71.4 10.0 C72.8 10.0 74.1 10.0 75.5 10.0 C76.9 10.0 78.2 10.0 79.6 10.0 C81.0 10.0 82.3 10.0 83.7 10.0 C85.1 10.0 86.4 10.0 87.8 10.0 C89.2 10.0 90.5 10.0 91.9 10.0 C93.3 10.0 94.9 9.9 96.0 10.0 C97.1 10.1 97.6 10.4 98.4 10.7 C99.2 11.0 99.9 11.4 100.5 11.8 C101.2 12.2 101.8 12.7 102.4 13.2 C102.9 13.8 103.4 14.3 103.8 14.9 C104.2 15.5 104.6 16.2 104.9 16.8 C105.2 17.5 105.4 18.1 105.6 18.8 C105.7 19.5 105.8 20.1 105.8 20.8 C105.8 21.4 105.8 22.1 105.7 22.7 C105.6 23.3 105.4 24.0 105.2 24.5 C105.0 25.1 104.8 25.6 104.4 26.2 C104.1 26.7 103.8 27.1 103.4 27.5 C103.0 28.0 102.6 28.3 102.2 28.7 C101.7 29.0 101.3 29.3 100.8 29.5 C100.3 29.7 99.8 29.9 99.3 30.0 C98.8 30.2 98.3 30.2 97.9 30.3 C97.4 30.3 96.9 30.3 96.4 30.2 C95.9 30.2 95.5 30.1 95.1 29.9 C94.6 29.8 94.2 29.6 93.8 29.4 C93.4 29.2 93.1 28.9 92.8 28.6 C92.4 28.4 92.2 28.0 91.9 27.7 C91.7 27.4 91.4 27.1 91.3 26.7 C91.1 26.4 90.9 26.0 90.8 25.6 C90.7 25.3 90.6 24.9 90.6 24.5 C90.6 24.2 90.6 23.8 90.6 23.5 C90.7 23.1 90.7 22.8 90.8 22.4 C90.9 22.1 91.0 21.8 91.2 21.5 C91.4 21.2 91.5 21.0 91.7 20.7 C91.9 20.5 92.2 20.2 92.4 20.0 C92.6 19.8 92.9 19.7 93.1 19.5 C93.4 19.4 93.7 19.3 93.9 19.2 C94.2 19.1 94.5 19.0 94.7 19.0 C95.0 19.0 95.3 19.0 95.5 19.0 C95.8 19.0 96.1 19.1 96.3 19.1 C96.5 19.2 96.8 19.3 97.0 19.4 C97.2 19.5 97.4 19.6 97.6 19.8 C97.8 19.9 98.0 20.1 98.1 20.2 C98.3 20.4 98.4 20.6 98.5 20.8 C98.6 21.0 98.7 21.2 98.8 21.4 C98.9 21.6 98.9 21.8 98.9 22.0 C99.0 22.2 99.0 22.4 99.0 22.6 C99.0 22.8 98.9 23.0 98.9 23.1 C98.9 23.3 98.8 23.5 98.7 23.7 C98.6 23.8 98.5 24.0 98.4 24.1 C98.3 24.3 98.2 24.5 98.1 24.5"/>
+<path pathLength="1" d="M10.0 14.0 C10.0 14.7 10.0 16.7 10.0 18.1 C10.0 19.5 10.0 20.8 10.0 22.2 C10.0 23.6 10.0 24.9 10.0 26.3 C10.0 27.7 10.0 29.0 10.0 30.4 C10.0 31.8 10.0 33.1 10.0 34.5 C10.0 35.9 10.0 37.2 10.0 38.6 C10.0 40.0 10.0 41.3 10.0 42.7 C10.0 44.1 10.0 45.4 10.0 46.8 C10.0 48.2 10.0 49.5 10.0 50.9 C10.0 52.3 10.0 53.6 10.0 55.0 C10.0 56.4 10.0 57.7 10.0 59.1 C10.0 60.5 10.0 61.8 10.0 63.2 C10.0 64.6 10.0 65.9 10.0 67.3 C10.0 68.7 10.0 70.0 10.0 71.4 C10.0 72.8 10.0 74.1 10.0 75.5 C10.0 76.9 10.0 78.2 10.0 79.6 C10.0 81.0 10.0 82.3 10.0 83.7 C10.0 85.1 10.0 86.4 10.0 87.8 C10.0 89.2 10.0 90.5 10.0 91.9 C10.0 93.3 9.9 94.9 10.0 96.0 C10.1 97.1 10.4 97.6 10.7 98.4 C11.0 99.2 11.4 99.9 11.8 100.5 C12.2 101.2 12.7 101.8 13.2 102.4 C13.8 102.9 14.3 103.4 14.9 103.8 C15.5 104.2 16.2 104.6 16.8 104.9 C17.5 105.2 18.1 105.4 18.8 105.6 C19.5 105.7 20.1 105.8 20.8 105.8 C21.4 105.8 22.1 105.8 22.7 105.7 C23.3 105.6 24.0 105.4 24.5 105.2 C25.1 105.0 25.6 104.8 26.2 104.4 C26.7 104.1 27.1 103.8 27.5 103.4 C28.0 103.0 28.3 102.6 28.7 102.2 C29.0 101.7 29.3 101.3 29.5 100.8 C29.7 100.3 29.9 99.8 30.0 99.3 C30.2 98.8 30.2 98.3 30.3 97.9 C30.3 97.4 30.3 96.9 30.2 96.4 C30.2 95.9 30.1 95.5 29.9 95.1 C29.8 94.6 29.6 94.2 29.4 93.8 C29.2 93.4 28.9 93.1 28.6 92.8 C28.4 92.4 28.0 92.2 27.7 91.9 C27.4 91.7 27.1 91.4 26.7 91.3 C26.4 91.1 26.0 90.9 25.6 90.8 C25.3 90.7 24.9 90.6 24.5 90.6 C24.2 90.6 23.8 90.6 23.5 90.6 C23.1 90.7 22.8 90.7 22.4 90.8 C22.1 90.9 21.8 91.0 21.5 91.2 C21.2 91.4 21.0 91.5 20.7 91.7 C20.5 91.9 20.2 92.2 20.0 92.4 C19.8 92.6 19.7 92.9 19.5 93.1 C19.4 93.4 19.3 93.7 19.2 93.9 C19.1 94.2 19.0 94.5 19.0 94.7 C19.0 95.0 19.0 95.3 19.0 95.5 C19.0 95.8 19.1 96.1 19.1 96.3 C19.2 96.5 19.3 96.8 19.4 97.0 C19.5 97.2 19.6 97.4 19.8 97.6 C19.9 97.8 20.1 98.0 20.2 98.1 C20.4 98.3 20.6 98.4 20.8 98.5 C21.0 98.6 21.2 98.7 21.4 98.8 C21.6 98.9 21.8 98.9 22.0 98.9 C22.2 99.0 22.4 99.0 22.6 99.0 C22.8 99.0 23.0 98.9 23.1 98.9 C23.3 98.9 23.5 98.8 23.7 98.7 C23.8 98.6 24.0 98.5 24.1 98.4 C24.3 98.3 24.5 98.2 24.5 98.1"/>
+<path pathLength="1" d="M36.0 10.0 C36.4 10.0 37.7 10.1 38.4 10.3 C39.2 10.5 39.9 10.8 40.6 11.1 C41.3 11.5 41.9 11.9 42.5 12.4 C43.2 12.9 43.7 13.4 44.3 14.0 C44.9 14.6 45.4 15.3 45.9 15.9 C46.5 16.6 47.0 17.3 47.5 18.0 C48.0 18.8 48.5 19.5 49.0 20.2 C49.5 21.0 50.0 21.8 50.5 22.5 C51.0 23.2 51.5 24.0 52.1 24.7 C52.6 25.4 53.1 26.1 53.7 26.8 C54.3 27.4 54.8 28.0 55.5 28.6 C56.1 29.2 56.7 29.7 57.4 30.2 C58.1 30.6 58.8 31.0 59.6 31.3 C60.3 31.6 61.4 31.9 62.0 32.0 C62.6 32.1 62.9 31.8 63.4 31.6 C63.8 31.5 64.2 31.3 64.6 31.0 C65.0 30.8 65.4 30.5 65.7 30.2 C66.0 30.0 66.3 29.6 66.6 29.3 C66.9 29.0 67.1 28.6 67.3 28.3 C67.5 27.9 67.6 27.5 67.8 27.2 C67.9 26.8 68.0 26.4 68.0 26.0 C68.1 25.6 68.1 25.2 68.1 24.9 C68.1 24.5 68.0 24.1 68.0 23.8 C67.9 23.4 67.8 23.1 67.6 22.8 C67.5 22.5 67.3 22.1 67.2 21.9 C67.0 21.6 66.8 21.3 66.5 21.1 C66.3 20.8 66.1 20.6 65.8 20.4 C65.6 20.2 65.3 20.1 65.0 19.9 C64.8 19.8 64.5 19.7 64.2 19.6 C63.9 19.5 63.6 19.5 63.3 19.4 C63.1 19.4 62.8 19.4 62.5 19.4 C62.2 19.5 61.9 19.5 61.7 19.6 C61.4 19.6 61.2 19.7 60.9 19.8 C60.7 19.9 60.5 20.1 60.3 20.2 C60.1 20.4 59.9 20.5 59.7 20.7 C59.5 20.9 59.4 21.1 59.2 21.2 C59.1 21.4 59.0 21.6 58.9 21.8 C58.8 22.1 58.7 22.3 58.7 22.5 C58.6 22.7 58.6 22.9 58.6 23.1 C58.6 23.3 58.6 23.6 58.6 23.8 C58.6 24.0 58.7 24.2 58.7 24.4 C58.8 24.5 58.8 24.7 58.9 24.9 C59.0 25.1 59.1 25.2 59.2 25.4 C59.3 25.5 59.5 25.7 59.6 25.8 C59.7 25.9 59.9 26.0 60.0 26.1 C60.2 26.2 60.3 26.3 60.5 26.4 C60.6 26.4 60.8 26.5 61.0 26.5 C61.1 26.5 61.3 26.6 61.4 26.6 C61.6 26.6 61.8 26.6 61.9 26.5 C62.1 26.5 62.2 26.5 62.4 26.4 C62.5 26.4 62.6 26.3 62.8 26.3 C62.9 26.2 63.0 26.1 63.1 26.0 C63.2 25.9 63.3 25.8 63.4 25.7 C63.5 25.6 63.6 25.5 63.6 25.4 C63.7 25.3 63.8 25.2 63.8 25.1 C63.8 25.0 63.9 24.8 63.9 24.7 C63.9 24.6 63.9 24.5 63.9 24.3 C63.9 24.2 63.9 24.1 63.9 24.0"/>
+<path pathLength="1" d="M10.0 36.0 C10.0 36.4 10.1 37.7 10.3 38.4 C10.5 39.2 10.8 39.9 11.1 40.6 C11.5 41.3 11.9 41.9 12.4 42.5 C12.9 43.2 13.4 43.7 14.0 44.3 C14.6 44.9 15.3 45.4 15.9 45.9 C16.6 46.5 17.3 47.0 18.0 47.5 C18.8 48.0 19.5 48.5 20.2 49.0 C21.0 49.5 21.8 50.0 22.5 50.5 C23.2 51.0 24.0 51.5 24.7 52.1 C25.4 52.6 26.1 53.1 26.8 53.7 C27.4 54.3 28.0 54.8 28.6 55.5 C29.2 56.1 29.7 56.7 30.2 57.4 C30.6 58.1 31.0 58.8 31.3 59.6 C31.6 60.3 31.9 61.4 32.0 62.0 C32.1 62.6 31.8 62.9 31.6 63.4 C31.5 63.8 31.3 64.2 31.0 64.6 C30.8 65.0 30.5 65.4 30.2 65.7 C30.0 66.0 29.6 66.3 29.3 66.6 C29.0 66.9 28.6 67.1 28.3 67.3 C27.9 67.5 27.5 67.6 27.2 67.8 C26.8 67.9 26.4 68.0 26.0 68.0 C25.6 68.1 25.2 68.1 24.9 68.1 C24.5 68.1 24.1 68.0 23.8 68.0 C23.4 67.9 23.1 67.8 22.8 67.6 C22.5 67.5 22.1 67.3 21.9 67.2 C21.6 67.0 21.3 66.8 21.1 66.5 C20.8 66.3 20.6 66.1 20.4 65.8 C20.2 65.6 20.1 65.3 19.9 65.0 C19.8 64.8 19.7 64.5 19.6 64.2 C19.5 63.9 19.5 63.6 19.4 63.3 C19.4 63.1 19.4 62.8 19.4 62.5 C19.5 62.2 19.5 61.9 19.6 61.7 C19.6 61.4 19.7 61.2 19.8 60.9 C19.9 60.7 20.1 60.5 20.2 60.3 C20.4 60.1 20.5 59.9 20.7 59.7 C20.9 59.5 21.1 59.4 21.2 59.2 C21.4 59.1 21.6 59.0 21.8 58.9 C22.1 58.8 22.3 58.7 22.5 58.7 C22.7 58.6 22.9 58.6 23.1 58.6 C23.3 58.6 23.6 58.6 23.8 58.6 C24.0 58.6 24.2 58.7 24.4 58.7 C24.5 58.8 24.7 58.8 24.9 58.9 C25.1 59.0 25.2 59.1 25.4 59.2 C25.5 59.3 25.7 59.5 25.8 59.6 C25.9 59.7 26.0 59.9 26.1 60.0 C26.2 60.2 26.3 60.3 26.4 60.5 C26.4 60.6 26.5 60.8 26.5 61.0 C26.5 61.1 26.6 61.3 26.6 61.4 C26.6 61.6 26.6 61.8 26.5 61.9 C26.5 62.1 26.5 62.2 26.4 62.4 C26.4 62.5 26.3 62.6 26.3 62.8 C26.2 62.9 26.1 63.0 26.0 63.1 C25.9 63.2 25.8 63.3 25.7 63.4 C25.6 63.5 25.5 63.6 25.4 63.6 C25.3 63.7 25.2 63.8 25.1 63.8 C25.0 63.8 24.8 63.9 24.7 63.9 C24.6 63.9 24.5 63.9 24.3 63.9 C24.2 63.9 24.1 63.9 24.0 63.9"/>
+<path pathLength="1" d="M72.0 10.0 C72.2 10.0 73.0 10.1 73.5 10.3 C74.0 10.4 74.5 10.7 74.9 11.0 C75.4 11.3 75.9 11.7 76.3 12.1 C76.7 12.5 77.1 13.0 77.5 13.5 C77.9 14.0 78.2 14.5 78.5 15.1 C78.8 15.6 79.1 16.2 79.3 16.8 C79.5 17.3 79.7 17.9 79.8 18.4 C79.9 19.0 80.0 19.6 80.0 20.0 C80.0 20.4 79.9 20.4 79.9 20.6 C79.8 20.7 79.7 20.9 79.6 21.1 C79.6 21.2 79.5 21.4 79.4 21.5 C79.2 21.7 79.1 21.8 79.0 21.9 C78.9 22.1 78.8 22.2 78.6 22.3 C78.5 22.4 78.4 22.5 78.2 22.6 C78.1 22.6 77.9 22.7 77.8 22.8 C77.6 22.8 77.5 22.9 77.3 22.9 C77.2 23.0 77.0 23.0 76.9 23.0 C76.7 23.0 76.6 23.0 76.4 23.0 C76.3 23.0 76.1 23.0 76.0 23.0 C75.9 22.9 75.7 22.9 75.6 22.9 C75.5 22.8 75.3 22.8 75.2 22.7 C75.1 22.6 75.0 22.6 74.9 22.5 C74.8 22.4 74.7 22.3 74.6 22.2 C74.5 22.1 74.4 22.0 74.3 22.0 C74.2 21.9 74.2 21.8 74.1 21.6 C74.0 21.5 74.0 21.4 73.9 21.3 C73.9 21.2 73.9 21.1 73.8 21.0 C73.8 20.9 73.8 20.8 73.8 20.7 C73.8 20.5 73.8 20.4 73.8 20.3 C73.8 20.2 73.8 20.1 73.8 20.0 C73.8 19.9 73.9 19.8 73.9 19.7 C73.9 19.6 74.0 19.5 74.0 19.4 C74.1 19.3 74.1 19.2 74.2 19.2 C74.2 19.1 74.3 19.0 74.3 18.9 C74.4 18.9 74.5 18.8 74.6 18.7 C74.6 18.7 74.7 18.6 74.8 18.6 C74.9 18.5 74.9 18.5 75.0 18.5 C75.1 18.4 75.2 18.4 75.3 18.4 C75.4 18.4 75.4 18.4 75.5 18.4 C75.6 18.3 75.7 18.3 75.8 18.4 C75.8 18.4 75.9 18.4 76.0 18.4 C76.1 18.4 76.2 18.4 76.2 18.4 C76.3 18.5 76.4 18.5 76.4 18.5 C76.5 18.6 76.6 18.6 76.6 18.6 C76.7 18.7 76.7 18.7 76.8 18.8 C76.8 18.8 76.9 18.9 76.9 18.9 C77.0 19.0 77.0 19.0 77.0 19.1 C77.1 19.2 77.1 19.2 77.1 19.3 C77.2 19.3 77.2 19.4 77.2 19.5 C77.2 19.5 77.2 19.6 77.2 19.6 C77.2 19.7 77.2 19.8 77.2 19.8 C77.2 19.9 77.2 20.0 77.2 20.0"/>
+<path pathLength="1" d="M10.0 72.0 C10.0 72.2 10.1 73.0 10.3 73.5 C10.4 74.0 10.7 74.5 11.0 74.9 C11.3 75.4 11.7 75.9 12.1 76.3 C12.5 76.7 13.0 77.1 13.5 77.5 C14.0 77.9 14.5 78.2 15.1 78.5 C15.6 78.8 16.2 79.1 16.8 79.3 C17.3 79.5 17.9 79.7 18.4 79.8 C19.0 79.9 19.6 80.0 20.0 80.0 C20.4 80.0 20.4 79.9 20.6 79.9 C20.7 79.8 20.9 79.7 21.1 79.6 C21.2 79.6 21.4 79.5 21.5 79.4 C21.7 79.2 21.8 79.1 21.9 79.0 C22.1 78.9 22.2 78.8 22.3 78.6 C22.4 78.5 22.5 78.4 22.6 78.2 C22.6 78.1 22.7 77.9 22.8 77.8 C22.8 77.6 22.9 77.5 22.9 77.3 C23.0 77.2 23.0 77.0 23.0 76.9 C23.0 76.7 23.0 76.6 23.0 76.4 C23.0 76.3 23.0 76.1 23.0 76.0 C22.9 75.9 22.9 75.7 22.9 75.6 C22.8 75.5 22.8 75.3 22.7 75.2 C22.6 75.1 22.6 75.0 22.5 74.9 C22.4 74.8 22.3 74.7 22.2 74.6 C22.1 74.5 22.0 74.4 22.0 74.3 C21.9 74.2 21.8 74.2 21.6 74.1 C21.5 74.0 21.4 74.0 21.3 73.9 C21.2 73.9 21.1 73.9 21.0 73.8 C20.9 73.8 20.8 73.8 20.7 73.8 C20.5 73.8 20.4 73.8 20.3 73.8 C20.2 73.8 20.1 73.8 20.0 73.8 C19.9 73.8 19.8 73.9 19.7 73.9 C19.6 73.9 19.5 74.0 19.4 74.0 C19.3 74.1 19.2 74.1 19.2 74.2 C19.1 74.2 19.0 74.3 18.9 74.3 C18.9 74.4 18.8 74.5 18.7 74.6 C18.7 74.6 18.6 74.7 18.6 74.8 C18.5 74.9 18.5 74.9 18.5 75.0 C18.4 75.1 18.4 75.2 18.4 75.3 C18.4 75.4 18.4 75.4 18.4 75.5 C18.3 75.6 18.3 75.7 18.4 75.8 C18.4 75.8 18.4 75.9 18.4 76.0 C18.4 76.1 18.4 76.2 18.4 76.2 C18.5 76.3 18.5 76.4 18.5 76.4 C18.6 76.5 18.6 76.6 18.6 76.6 C18.7 76.7 18.7 76.7 18.8 76.8 C18.8 76.8 18.9 76.9 18.9 76.9 C19.0 77.0 19.0 77.0 19.1 77.0 C19.2 77.1 19.2 77.1 19.3 77.1 C19.3 77.2 19.4 77.2 19.5 77.2 C19.5 77.2 19.6 77.2 19.6 77.2 C19.7 77.2 19.8 77.2 19.8 77.2 C19.9 77.2 20.0 77.2 20.0 77.2"/>
+<path pathLength="1" d="M10.0 10.0 C10.6 10.6 12.3 12.3 13.5 13.5 C14.7 14.7 15.8 15.8 17.0 17.0 C18.2 18.2 19.3 19.3 20.5 20.5 C21.7 21.7 23.4 23.4 24.0 24.0"/>
+</g>
+<g class="orn-fills">
+<circle cx="98.1" cy="24.5" r="2.6"/>
+<circle cx="24.5" cy="98.1" r="2.6"/>
+<circle cx="63.9" cy="24.0" r="2.0"/>
+<circle cx="24.0" cy="63.9" r="2.0"/>
+<circle cx="77.2" cy="20.0" r="1.5"/>
+<circle cx="20.0" cy="77.2" r="1.5"/>
+<path d="M80.0 9.0 C81.8 3.2 87.6 1.5 91.1 2.2 C90.1 5.6 86.0 10.0 80.0 9.0Z"/>
+<path d="M54.0 11.0 C58.9 9.2 62.9 12.4 64.1 15.3 C61.3 16.4 56.1 15.8 54.0 11.0Z"/>
+<g transform="matrix(0 1 1 0 0 0)"><path d="M80.0 9.0 C81.8 3.2 87.6 1.5 91.1 2.2 C90.1 5.6 86.0 10.0 80.0 9.0Z"/><path d="M54.0 11.0 C58.9 9.2 62.9 12.4 64.1 15.3 C61.3 16.4 56.1 15.8 54.0 11.0Z"/></g>
+<path d="M24.0 24.0 C31.4 24.0 34.7 30.3 34.6 34.6 C30.3 34.7 24.0 31.4 24.0 24.0Z M22.0 22.0 C25.1 18.4 29.7 19.2 31.9 20.9 C30.2 23.0 25.8 24.8 22.0 22.0Z M22.0 22.0 C24.8 25.8 23.0 30.2 20.9 31.9 C19.2 29.7 18.4 25.1 22.0 22.0Z"/>
+<rect x="5" y="5" width="10" height="10" transform="rotate(45 10 10)"/>
+<circle cx="10" cy="10" r="2" class="orn-hole"/>
+</g></symbol>
+    <symbol id="orn-divider" viewBox="0 0 240 44"><g class="orn-strokes" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path pathLength="1" d="M130.0 22.0 C130.7 22.0 132.7 22.1 134.0 22.3 C135.2 22.5 136.4 22.7 137.5 23.0 C138.7 23.4 139.7 23.7 140.8 24.2 C141.8 24.6 142.8 25.0 143.7 25.5 C144.7 26.0 145.6 26.5 146.5 27.0 C147.4 27.5 148.3 28.0 149.2 28.5 C150.0 29.0 150.9 29.4 151.8 29.8 C152.6 30.3 153.5 30.6 154.4 31.0 C155.3 31.3 156.2 31.5 157.1 31.7 C158.0 31.9 159.3 32.0 160.0 32.0 C160.7 32.0 160.8 31.8 161.2 31.7 C161.5 31.5 161.9 31.4 162.2 31.2 C162.5 31.0 162.8 30.7 163.1 30.5 C163.4 30.3 163.6 30.0 163.9 29.7 C164.1 29.5 164.3 29.2 164.5 28.9 C164.6 28.6 164.8 28.3 164.9 28.0 C165.0 27.6 165.1 27.3 165.2 27.0 C165.2 26.7 165.2 26.4 165.2 26.1 C165.2 25.8 165.2 25.4 165.2 25.1 C165.1 24.9 165.0 24.6 165.0 24.3 C164.9 24.0 164.7 23.7 164.6 23.5 C164.5 23.3 164.3 23.0 164.1 22.8 C164.0 22.6 163.8 22.4 163.6 22.2 C163.4 22.1 163.2 21.9 163.0 21.8 C162.7 21.6 162.5 21.5 162.3 21.4 C162.1 21.3 161.8 21.3 161.6 21.2 C161.4 21.2 161.1 21.2 160.9 21.1 C160.7 21.1 160.4 21.1 160.2 21.2 C160.0 21.2 159.8 21.3 159.6 21.3 C159.4 21.4 159.2 21.5 159.0 21.6 C158.8 21.7 158.6 21.8 158.5 21.9 C158.3 22.0 158.2 22.2 158.0 22.3 C157.9 22.4 157.8 22.6 157.7 22.7 C157.6 22.9 157.5 23.1 157.4 23.2 C157.3 23.4 157.3 23.6 157.2 23.7 C157.2 23.9 157.2 24.1 157.2 24.3 C157.2 24.4 157.2 24.6 157.2 24.8 C157.2 24.9 157.2 25.1 157.3 25.2 C157.3 25.4 157.4 25.5 157.4 25.7 C157.5 25.8 157.6 25.9 157.7 26.1 C157.8 26.2 157.9 26.3 158.0 26.4 C158.1 26.5 158.2 26.6 158.3 26.7 C158.4 26.7 158.5 26.8 158.6 26.9 C158.8 26.9 158.9 27.0 159.0 27.0 C159.1 27.0 159.3 27.1 159.4 27.1 C159.5 27.1 159.6 27.1 159.8 27.1 C159.9 27.1 160.0 27.0 160.1 27.0 C160.2 27.0 160.3 27.0 160.4 26.9 C160.5 26.9 160.6 26.8 160.7 26.7 C160.8 26.7 160.9 26.6 161.0 26.5 C161.1 26.5 161.1 26.4 161.2 26.3 C161.3 26.2 161.3 26.1 161.4 26.0 C161.4 26.0 161.4 25.9 161.5 25.8 C161.5 25.7 161.5 25.5 161.5 25.5"/>
+<path pathLength="1" d="M110.0 22.0 C109.3 22.0 107.3 22.1 106.0 22.3 C104.8 22.5 103.6 22.7 102.5 23.0 C101.3 23.4 100.3 23.7 99.2 24.2 C98.2 24.6 97.2 25.0 96.3 25.5 C95.3 26.0 94.4 26.5 93.5 27.0 C92.6 27.5 91.7 28.0 90.8 28.5 C90.0 29.0 89.1 29.4 88.2 29.8 C87.4 30.3 86.5 30.6 85.6 31.0 C84.7 31.3 83.8 31.5 82.9 31.7 C82.0 31.9 80.7 32.0 80.0 32.0 C79.3 32.0 79.2 31.8 78.8 31.7 C78.5 31.5 78.1 31.4 77.8 31.2 C77.5 31.0 77.2 30.7 76.9 30.5 C76.6 30.3 76.4 30.0 76.1 29.7 C75.9 29.5 75.7 29.2 75.5 28.9 C75.4 28.6 75.2 28.3 75.1 28.0 C75.0 27.6 74.9 27.3 74.8 27.0 C74.8 26.7 74.8 26.4 74.8 26.1 C74.8 25.8 74.8 25.4 74.8 25.1 C74.9 24.9 75.0 24.6 75.0 24.3 C75.1 24.0 75.3 23.7 75.4 23.5 C75.5 23.3 75.7 23.0 75.9 22.8 C76.0 22.6 76.2 22.4 76.4 22.2 C76.6 22.1 76.8 21.9 77.0 21.8 C77.3 21.6 77.5 21.5 77.7 21.4 C77.9 21.3 78.2 21.3 78.4 21.2 C78.6 21.2 78.9 21.2 79.1 21.1 C79.3 21.1 79.6 21.1 79.8 21.2 C80.0 21.2 80.2 21.3 80.4 21.3 C80.6 21.4 80.8 21.5 81.0 21.6 C81.2 21.7 81.4 21.8 81.5 21.9 C81.7 22.0 81.8 22.2 82.0 22.3 C82.1 22.4 82.2 22.6 82.3 22.7 C82.4 22.9 82.5 23.1 82.6 23.2 C82.7 23.4 82.7 23.6 82.8 23.7 C82.8 23.9 82.8 24.1 82.8 24.3 C82.8 24.4 82.8 24.6 82.8 24.8 C82.8 24.9 82.8 25.1 82.7 25.2 C82.7 25.4 82.6 25.5 82.6 25.7 C82.5 25.8 82.4 25.9 82.3 26.1 C82.2 26.2 82.1 26.3 82.0 26.4 C81.9 26.5 81.8 26.6 81.7 26.7 C81.6 26.7 81.5 26.8 81.4 26.9 C81.2 26.9 81.1 27.0 81.0 27.0 C80.9 27.0 80.7 27.1 80.6 27.1 C80.5 27.1 80.4 27.1 80.2 27.1 C80.1 27.1 80.0 27.0 79.9 27.0 C79.8 27.0 79.7 27.0 79.6 26.9 C79.5 26.9 79.4 26.8 79.3 26.7 C79.2 26.7 79.1 26.6 79.0 26.5 C78.9 26.5 78.9 26.4 78.8 26.3 C78.7 26.2 78.7 26.1 78.6 26.0 C78.6 26.0 78.6 25.9 78.5 25.8 C78.5 25.7 78.5 25.5 78.5 25.5"/>
+<path pathLength="1" d="M130.0 22.0 C130.8 21.9 133.2 21.9 134.9 21.7 C136.5 21.5 138.1 21.1 139.8 20.8 C141.5 20.4 143.1 19.9 144.8 19.5 C146.5 19.0 148.2 18.4 149.9 17.9 C151.6 17.4 153.3 16.8 155.0 16.2 C156.7 15.7 158.4 15.2 160.1 14.7 C161.8 14.2 163.5 13.7 165.2 13.3 C166.9 12.9 168.5 12.5 170.2 12.3 C171.9 12.0 173.5 11.8 175.1 11.8 C176.8 11.7 179.0 11.9 180.0 12.0 C181.0 12.1 180.7 12.2 181.0 12.3 C181.4 12.4 181.7 12.6 182.0 12.7 C182.3 12.9 182.5 13.1 182.8 13.3 C183.0 13.5 183.2 13.8 183.4 14.0 C183.6 14.3 183.8 14.5 184.0 14.8 C184.1 15.1 184.2 15.4 184.3 15.6 C184.4 15.9 184.5 16.2 184.5 16.5 C184.6 16.8 184.6 17.1 184.6 17.3 C184.5 17.6 184.5 17.9 184.5 18.2 C184.4 18.4 184.3 18.7 184.2 18.9 C184.1 19.2 184.0 19.4 183.9 19.6 C183.7 19.8 183.6 20.0 183.4 20.2 C183.2 20.4 183.0 20.5 182.9 20.7 C182.7 20.8 182.5 20.9 182.3 21.0 C182.1 21.1 181.8 21.2 181.6 21.3 C181.4 21.3 181.2 21.4 181.0 21.4 C180.8 21.4 180.6 21.4 180.4 21.4 C180.2 21.4 180.0 21.3 179.8 21.3 C179.6 21.3 179.4 21.2 179.2 21.1 C179.0 21.0 178.9 20.9 178.7 20.8 C178.6 20.7 178.4 20.6 178.3 20.5 C178.2 20.3 178.0 20.2 178.0 20.0 C177.9 19.9 177.8 19.8 177.7 19.6 C177.6 19.4 177.6 19.3 177.5 19.1 C177.5 19.0 177.5 18.8 177.5 18.6 C177.4 18.5 177.5 18.3 177.5 18.2 C177.5 18.0 177.5 17.9 177.6 17.7 C177.6 17.6 177.7 17.5 177.7 17.3 C177.8 17.2 177.9 17.1 177.9 17.0 C178.0 16.9 178.1 16.8 178.2 16.7 C178.3 16.6 178.4 16.5 178.5 16.4 C178.6 16.4 178.8 16.3 178.9 16.2 C179.0 16.2 179.1 16.2 179.2 16.1 C179.3 16.1 179.5 16.1 179.6 16.1 C179.7 16.1 179.8 16.1 179.9 16.1 C180.0 16.1 180.2 16.2 180.3 16.2 C180.4 16.2 180.5 16.3 180.6 16.3 C180.7 16.4 180.7 16.4 180.8 16.5 C180.9 16.6 181.0 16.6 181.0 16.7 C181.1 16.8 181.2 16.9 181.2 17.0 C181.3 17.0 181.3 17.1 181.3 17.2 C181.4 17.3 181.4 17.4 181.4 17.5 C181.4 17.6 181.4 17.7 181.4 17.7 C181.4 17.8 181.4 18.0 181.4 18.0"/>
+<path pathLength="1" d="M110.0 22.0 C109.2 21.9 106.8 21.9 105.1 21.7 C103.5 21.5 101.9 21.1 100.2 20.8 C98.5 20.4 96.9 19.9 95.2 19.5 C93.5 19.0 91.8 18.4 90.1 17.9 C88.4 17.4 86.7 16.8 85.0 16.2 C83.3 15.7 81.6 15.2 79.9 14.7 C78.2 14.2 76.5 13.7 74.8 13.3 C73.1 12.9 71.5 12.5 69.8 12.3 C68.1 12.0 66.5 11.8 64.9 11.8 C63.2 11.7 61.0 11.9 60.0 12.0 C59.0 12.1 59.3 12.2 59.0 12.3 C58.6 12.4 58.3 12.6 58.0 12.7 C57.7 12.9 57.5 13.1 57.2 13.3 C57.0 13.5 56.8 13.8 56.6 14.0 C56.4 14.3 56.2 14.5 56.0 14.8 C55.9 15.1 55.8 15.4 55.7 15.6 C55.6 15.9 55.5 16.2 55.5 16.5 C55.4 16.8 55.4 17.1 55.4 17.3 C55.5 17.6 55.5 17.9 55.5 18.2 C55.6 18.4 55.7 18.7 55.8 18.9 C55.9 19.2 56.0 19.4 56.1 19.6 C56.3 19.8 56.4 20.0 56.6 20.2 C56.8 20.4 57.0 20.5 57.1 20.7 C57.3 20.8 57.5 20.9 57.7 21.0 C57.9 21.1 58.2 21.2 58.4 21.3 C58.6 21.3 58.8 21.4 59.0 21.4 C59.2 21.4 59.4 21.4 59.6 21.4 C59.8 21.4 60.0 21.3 60.2 21.3 C60.4 21.3 60.6 21.2 60.8 21.1 C61.0 21.0 61.1 20.9 61.3 20.8 C61.4 20.7 61.6 20.6 61.7 20.5 C61.8 20.3 62.0 20.2 62.0 20.0 C62.1 19.9 62.2 19.8 62.3 19.6 C62.4 19.4 62.4 19.3 62.5 19.1 C62.5 19.0 62.5 18.8 62.5 18.6 C62.6 18.5 62.5 18.3 62.5 18.2 C62.5 18.0 62.5 17.9 62.4 17.7 C62.4 17.6 62.3 17.5 62.3 17.3 C62.2 17.2 62.1 17.1 62.1 17.0 C62.0 16.9 61.9 16.8 61.8 16.7 C61.7 16.6 61.6 16.5 61.5 16.4 C61.4 16.4 61.2 16.3 61.1 16.2 C61.0 16.2 60.9 16.2 60.8 16.1 C60.7 16.1 60.5 16.1 60.4 16.1 C60.3 16.1 60.2 16.1 60.1 16.1 C60.0 16.1 59.8 16.2 59.7 16.2 C59.6 16.2 59.5 16.3 59.4 16.3 C59.3 16.4 59.3 16.4 59.2 16.5 C59.1 16.6 59.0 16.6 59.0 16.7 C58.9 16.8 58.8 16.9 58.8 17.0 C58.7 17.0 58.7 17.1 58.7 17.2 C58.6 17.3 58.6 17.4 58.6 17.5 C58.6 17.6 58.6 17.7 58.6 17.7 C58.6 17.8 58.6 18.0 58.6 18.0"/>
+<path pathLength="1" d="M172.0 22.0 C173.2 22.0 176.7 22.0 179.0 22.0 C181.3 22.0 183.7 22.0 186.0 22.0 C188.3 22.0 190.7 22.0 193.0 22.0 C195.3 22.0 197.7 22.0 200.0 22.0 C202.3 22.0 204.7 22.0 207.0 22.0 C209.3 22.0 211.7 22.0 214.0 22.0 C216.3 22.0 218.7 22.0 221.0 22.0 C223.3 22.0 226.8 22.0 228.0 22.0"/>
+<path pathLength="1" d="M68.0 22.0 C66.8 22.0 63.3 22.0 61.0 22.0 C58.7 22.0 56.3 22.0 54.0 22.0 C51.7 22.0 49.3 22.0 47.0 22.0 C44.7 22.0 42.3 22.0 40.0 22.0 C37.7 22.0 35.3 22.0 33.0 22.0 C30.7 22.0 28.3 22.0 26.0 22.0 C23.7 22.0 21.3 22.0 19.0 22.0 C16.7 22.0 13.2 22.0 12.0 22.0"/>
+</g><g class="orn-fills">
+<circle cx="161.5" cy="25.5" r="1.8"/><circle cx="78.5" cy="25.5" r="1.8"/>
+<circle cx="181.4" cy="18.0" r="1.6"/><circle cx="58.6" cy="18.0" r="1.6"/>
+<circle cx="230.0" cy="22.0" r="2.2"/><circle cx="10.0" cy="22.0" r="2.2"/>
+<path d="M186.0 23.0 C191.3 21.6 195.6 25.2 196.8 28.2 C193.7 29.1 188.2 28.1 186.0 23.0Z"/>
+<path d="M200.0 21.0 C201.5 16.5 206.1 15.5 208.8 16.2 C207.9 18.8 204.6 22.1 200.0 21.0Z"/>
+<g transform="matrix(-1 0 0 1 240 0)"><path d="M186.0 23.0 C191.3 21.6 195.6 25.2 196.8 28.2 C193.7 29.1 188.2 28.1 186.0 23.0Z"/><path d="M200.0 21.0 C201.5 16.5 206.1 15.5 208.8 16.2 C207.9 18.8 204.6 22.1 200.0 21.0Z"/></g>
+<rect x="114" y="16" width="12" height="12" transform="rotate(45 120 22)"/>
+<circle cx="120" cy="22" r="2.4" class="orn-hole"/>
+<path d="M120.0 15.0 C116.0 10.8 117.6 5.4 120.0 3.0 C122.4 5.4 124.0 10.8 120.0 15.0Z"/><path d="M120.0 29.0 C123.0 32.1 121.8 36.2 120.0 38.0 C118.2 36.2 117.0 32.1 120.0 29.0Z"/>
+</g></symbol>
+    <symbol id="emblem" viewBox="0 0 100 100">
+      <g class="em-ring"><circle cx="50" cy="50" r="47" fill="none" stroke="url(#gFill)" stroke-width="1.2" stroke-dasharray="1.5 4.2" stroke-linecap="round"/></g>
+      <circle cx="50" cy="50" r="42" fill="none" stroke="url(#gFill)" stroke-width="1.4"/>
+      <circle class="em-pulse" cx="50" cy="52" r="30" fill="none" stroke="#f1d68a" stroke-width="1"/>
+      <path d="M50 17 74 26.5v17.2C74 58.8 63.8 71 50 76 36.2 71 26 58.8 26 43.7V26.5z" fill="url(#gFill)" stroke="#fff3c8" stroke-width=".9"/>
+      <path d="M50 22.5 69 30v14c0 12.2-8 22.2-19 26.4C39 66.2 31 56.2 31 44V30z" fill="none" stroke="#7a5518" stroke-width=".8" opacity=".55"/>
+      <path d="M56.5 29.5C48.2 28.6 42.6 34.4 42.6 41.4c0 3.4 2 5 3.9 6 1.6.9 1.6 3 0 3.9-1.9 1-3.9 2.6-3.9 6 0 6.6 5.4 11.6 13.6 10.6 7-.9 10.4-8.6 10.4-19.1 0-10.6-3.6-18.4-10.1-19.3z" fill="#0d1d47"/>
+      <path d="M46.4 49.4c-4.6 0-7.6 3.2-7.6 7.6v6.4" fill="none" stroke="#0d1d47" stroke-width="2.4" stroke-linecap="round"/>
+      <path class="em-drop" d="M38.8 66.2c-1.5 2-2.4 3.4-2.4 4.6a2.4 2.4 0 0 0 4.8 0c0-1.2-.9-2.6-2.4-4.6z" fill="#a8232c"/>
+      <path d="M55 34.5c-3.6 1-5.8 3.8-6 7.2" stroke="#f6dc94" stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".85"/>
+    </symbol>
+  </defs>
+</svg>
+
+<canvas id="snow" aria-hidden="true"></canvas>
+
+<div id="loader">
+  <div class="ld">
+    <svg class="emblem" viewBox="0 0 100 100"><use href="#emblem"/></svg>
+    <p>ACTION PLAN</p>
+    <small id="ldText">กำลังเชื่อมต่อ Google Sheet…</small>
+  </div>
+</div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="side-scroll">
+    <div class="brand frame glow-run slow">
+      <svg class="emblem" viewBox="0 0 100 100"><use href="#emblem"/></svg>
+      <div class="b-kicker gold-text">ACTION PLAN</div>
+      <div class="b-title" id="brandUnit">หน่วยไตเทียม</div>
+      <div class="b-sub" id="brandFy">แผนปฏิบัติงาน ปีงบประมาณ —</div>
+    </div>
+    <div class="nav-label">MENU · เมนู</div>
+    <nav id="nav"></nav>
+  </div>
+  <div class="side-foot">
+    <div class="user-card">
+      <div class="avatar" id="avatar">อ</div>
+      <div><div class="u-name" id="uName">อ้อมอารีย์</div><div class="u-role" id="uRole">หัวหน้าหน่วยไตเทียม</div></div>
+    </div>
+    <div class="conn"><span class="dot" id="connDot"></span><span id="connText">ยังไม่เชื่อมต่อ</span></div>
+  </div>
+</aside>
+<div class="scrim" id="scrim"></div>
+
+<header class="topbar">
+  <button class="icon-btn" id="menuBtn" aria-label="เปิดเมนู" data-act="toggle-nav"></button>
+  <div class="tb-title"><small id="tbKicker">ACTION PLAN</small><b id="tbTitle">หน้าหลัก</b></div>
+  <div class="tb-spacer"></div>
+  <div class="clock-pill"><span data-icon="clock"></span><span id="tbClock">--:--:-- น.</span></div>
+  <button class="icon-btn" id="syncBtn" data-act="sync" title="ดึงข้อมูลล่าสุดจาก Google Sheet" aria-label="ซิงก์ข้อมูล"></button>
+</header>
+
+<main class="main" id="view"></main>
+<button class="fab" id="fab" data-act="add" aria-label="เพิ่มแผนงาน"></button>
+<div id="modalRoot"></div>
+<div id="toasts"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   Action Plan หน่วยไตเทียม — Front-end
+   ========================================================= */
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwQTpbxStIA1cjqxblP8p-_lUNjEz021Zcibw6EQuKL_-O4U9fwe-x7y79YxjUS4guR/exec';
+const LS_API = 'hdap.apiUrl', LS_CACHE = 'hdap.cache.v1';
+const MONTHS = ['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'];
+const MONTHS_FULL = ['ตุลาคม','พฤศจิกายน','ธันวาคม','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน'];
+const S_EN = {1:'Infectious Disease Excellence',2:'Management System',3:'Expert Workforce',4:'Research & Innovation',5:'Nursing Informatics'};
+const S_ICON = {1:'shield',2:'gears',3:'award',4:'flask',5:'monitor'};
+
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
+
+const S = {
+  apiUrl: lsGet(LS_API) || DEFAULT_API_URL,
+  data: null, online: false, fromCache: false, error: '',
+  filter: { s: 0, q: '' }
 };
 
-const SETTING_DEFAULTS = [
-  ['unitName', 'หน่วยไตเทียม', 'ชื่อหน่วยงาน (แสดงในหัวเอกสาร)'],
-  ['fiscalYear', '2569', 'ปีงบประมาณ'],
-  ['orgLine', 'กลุ่มการพยาบาล สถาบันบำราศนราดูร', 'สังกัด (บรรทัดที่สองของหัวเอกสาร)'],
-  ['headName', 'อ้อมอารีย์', 'หัวหน้าหน่วยงาน'],
-  ['headPosition', 'หัวหน้าหน่วยไตเทียม', 'ตำแหน่งหัวหน้าหน่วยงาน'],
-  ['seeded', '', 'ระบบใช้ตรวจว่าใส่ข้อมูลตั้งต้นแล้ว (กรุณาอย่าลบ)']
+/* ---------------- icons ---------------- */
+const I = {
+  home:'<path d="M3 9.5 12 4l9 5.5"/><path d="M4.5 9.5h15"/><path d="M6.5 12v5.5M10.2 12v5.5M13.8 12v5.5M17.5 12v5.5"/><path d="M4 19h16M3 21h18"/><circle class="fill twinkle" cx="12" cy="7.2" r=".9"/>',
+  plans:'<rect x="5" y="3" width="14" height="18" rx="2.2"/><path class="draw" pathLength="1" d="M8.5 8h7M8.5 12h7M8.5 16h4.5"/>',
+  table:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8.5 4v16"/><path class="grow" pathLength="1" d="M10.8 12.6h6.4" stroke-width="2.4"/><path class="grow" pathLength="1" d="M12.6 16.2h5.6" stroke-width="2.4" style="animation-delay:.5s"/>',
+  pdf:'<path d="M14 3H7.2A2.2 2.2 0 0 0 5 5.2v13.6A2.2 2.2 0 0 0 7.2 21h9.6a2.2 2.2 0 0 0 2.2-2.2V8z"/><path d="M14 3v5h5"/><g class="bounce"><path d="M12 10.5v6.2M9.4 14.2 12 16.8l2.6-2.6"/></g>',
+  gear:'<g class="spin"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/><circle cx="12" cy="12" r="6.3"/></g>',
+  shield:'<path d="M12 2.8 19.5 6v5.6c0 4.6-3.2 8.3-7.5 9.6-4.3-1.3-7.5-5-7.5-9.6V6z"/><g class="spin"><circle cx="12" cy="11.8" r="2.4"/><path d="M12 7.4v1.8M12 14.4v1.8M7.6 11.8h1.8M14.6 11.8h1.8M8.9 8.7l1.2 1.2M13.9 13.7l1.2 1.2M8.9 14.9l1.2-1.2M13.9 9.9l1.2-1.2"/></g>',
+  gears:'<g class="spin"><circle cx="9" cy="9.5" r="2.3"/><path d="M9 4.6v1.7M9 12.7v1.7M4.1 9.5h1.7M12.2 9.5h1.7M5.5 6l1.2 1.2M11.3 11.8l1.2 1.2M5.5 13l1.2-1.2M11.3 7.2 12.5 6"/><circle cx="9" cy="9.5" r="4.1"/></g><g class="spin-rev"><circle cx="16.6" cy="16.4" r="1.7"/><path d="M16.6 12.6v1.3M16.6 18.9v1.3M12.8 16.4h1.3M19.1 16.4h1.3"/><circle cx="16.6" cy="16.4" r="3"/></g>',
+  award:'<circle cx="12" cy="9" r="5.6"/><path d="M8.6 13.6 7 21l5-2.6 5 2.6-1.6-7.4"/><path class="fill twinkle" d="m12 5.9.95 1.9 2.1.3-1.5 1.5.35 2.1L12 10.7l-1.9 1 .35-2.1-1.5-1.5 2.1-.3z"/>',
+  flask:'<path d="M9.4 3h5.2M10.5 3v5.6L5.3 18.2A2 2 0 0 0 7.1 21h9.8a2 2 0 0 0 1.8-2.8L13.5 8.6V3"/><path d="M7.4 15h9.2"/><circle class="fill bub" cx="11" cy="17.6" r="1"/><circle class="fill bub b2" cx="13.8" cy="18.3" r=".75"/>',
+  monitor:'<rect x="3" y="4" width="18" height="12.4" rx="2"/><path d="M8.5 20.2h7M12 16.4v3.8"/><path class="ecg" pathLength="1" d="M5.4 10.6h3.1l1.4-3 2.2 5.8 1.6-3.8 1.2 1h3.7"/>',
+  flag:'<path d="M5 21V3.5"/><path class="wave" d="M5 4.4c3-1.7 5.6 1.7 8.6 0 2.6-1.4 4.3-.8 5.6 0v8.2c-1.3-.8-3-1.4-5.6 0-3 1.7-5.6-1.7-8.6 0z"/>',
+  calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M3.5 9.6h17M8 3v4M16 3v4"/><path class="draw" pathLength="1" d="m8.8 14.8 2.2 2.2 4.4-4.4"/>',
+  target:'<circle cx="12" cy="12" r="8.6"/><circle class="pulse" cx="12" cy="12" r="5.2"/><circle cx="12" cy="12" r="4.4"/><circle class="fill" cx="12" cy="12" r="1.7"/>',
+  users:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.2 2.9-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.8" cy="9" r="2.5"/><path d="M15.6 14.4c2.6-.3 4.5 1.4 5 4.6"/>',
+  coins:'<ellipse cx="12" cy="6.5" rx="6.5" ry="2.5"/><path d="M5.5 6.5v5c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5v-5"/><path d="M5.5 11.5v5c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5v-5"/>',
+  edit:'<path d="M4 20h4L19.2 8.8a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.6 6.4 4 4"/>',
+  trash:'<g class="lid"><path d="M4 6.5h16M9.5 6.5V4.5h5v2"/></g><path d="M6 6.5l1 13a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4l1-13"/><path d="M10 10.5v6M14 10.5v6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  close:'<path d="M6 6l12 12M18 6 6 18"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
+  sync:'<path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18.5 3.5v3.8h-3.8M5.5 20.5v-3.8h3.8"/>',
+  sheet:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/>',
+  up:'<path d="m6 15 6-6 6 6"/>',
+  down:'<path d="m6 9 6 6 6-6"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path class="spin" style="transform-origin:12px 12px;transform-box:view-box;animation-duration:60s" d="M12 7.5V12l3 2"/>',
+  download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  alert:'<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.3v.2"/>',
+  spark:'<path class="twinkle" d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7z"/>',
+  save:'<path d="M5 3.5h11l3.5 3.5v12a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 19V5A1.5 1.5 0 0 1 6 3.5z"/><path d="M8 3.5v5h7v-5M8 20.5v-6h8v6"/>'
+};
+const icon = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n] || ''}</svg>`;
+const corners = (dark) => ['tl','tr','bl','br'].map(c => `<svg class="corner ${c}${dark ? ' dark-orn' : ''}" viewBox="0 0 140 140" aria-hidden="true"><use href="#orn-corner"/></svg>`).join('');
+const divider = (dark) => `<div class="divider${dark ? ' dark-orn' : ''}"><svg viewBox="0 0 240 44" aria-hidden="true"><use href="#orn-divider"/></svg></div>`;
+function hydrateIcons(root = document) { root.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); el.removeAttribute('data-icon'); }); }
+
+/* ---------------- utils ---------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const fv = (f, n) => f.querySelector(`[name="${n}"]`);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const pad2 = n => String(n).padStart(2, '0');
+const fiscalIdx = (d = new Date()) => (d.getMonth() + 3) % 12;
+const kpiList = p => String(p.indicators || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+const respList = p => String(p.responsible || '').split(/\s*[,，、]\s*|\n/).map(s => s.trim()).filter(Boolean);
+function runs(months) {
+  const out = []; let st = -1;
+  for (let i = 0; i <= 12; i++) {
+    const on = i < 12 && !!(months && months[i]);
+    if (on && st < 0) st = i;
+    if (!on && st >= 0) { out.push([st, i - 1]); st = -1; }
+  }
+  return out;
+}
+function thaiDate(d = new Date()) {
+  try { return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }); }
+  catch (e) { return d.toLocaleDateString(); }
+}
+function fmtUpdated(s) {
+  if (!s) return '';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+  if (!m) return s;
+  return `${+m[3]} ${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][+m[2] - 1]} ${+m[1] + 543}${m[4] ? ` เวลา ${m[4]}:${m[5]} น.` : ''}`;
+}
+const settings = () => (S.data && S.data.settings) || {};
+const strategies = () => {
+  const d = S.data || {};
+  const list = (d.strategies || []).slice();
+  (d.projects || []).forEach(p => { if (!list.some(s => s.no === p.strategyNo)) list.push({ no: p.strategyNo, name: 'ยุทธศาสตร์ที่ ' + p.strategyNo }); });
+  return list.sort((a, b) => a.no - b.no);
+};
+const projectsOf = no => ((S.data && S.data.projects) || []).filter(p => p.strategyNo === no).sort((a, b) => a.order - b.order);
+const stratName = no => (strategies().find(s => s.no === no) || {}).name || ('ยุทธศาสตร์ที่ ' + no);
+
+/* ---------------- api ---------------- */
+async function api(action, data) {
+  const res = await fetch(S.apiUrl, {
+    method: 'POST', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, data: data || {} })
+  });
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); }
+  catch (e) { throw new Error('Apps Script ตอบกลับไม่ใช่ข้อมูล JSON — ตรวจสอบว่าวาง Code.gs ใหม่และ Deploy เป็นเวอร์ชันใหม่แล้ว (สิทธิ์เข้าถึง: ทุกคน)'); }
+  if (!json.ok) throw new Error(json.error || 'เกิดข้อผิดพลาดจาก Google Sheet');
+  return json;
+}
+function setConn(state, text) {
+  const dot = $('#connDot'); dot.className = 'dot ' + (state || '');
+  $('#connText').textContent = text;
+  $('#syncBtn').classList.toggle('spinning', state === 'busy');
+}
+function applyData(d, fromCache) {
+  S.data = d; S.fromCache = !!fromCache;
+  if (!fromCache) lsSet(LS_CACHE, JSON.stringify(d));
+}
+async function load(silent) {
+  setConn('busy', 'กำลังซิงก์กับ Google Sheet…');
+  try {
+    const d = await api('getAll');
+    applyData(d); S.online = true; S.error = '';
+    setConn('ok', 'เชื่อมต่อ Google Sheet แล้ว');
+    if (!silent) toast('ดึงข้อมูลล่าสุดจาก Google Sheet แล้ว');
+  } catch (err) {
+    S.online = false; S.error = err.message || String(err);
+    setConn('bad', 'เชื่อมต่อไม่สำเร็จ');
+    if (!S.data) {
+      const c = lsGet(LS_CACHE);
+      if (c) { try { applyData(JSON.parse(c), true); } catch (e) {} }
+    }
+    toast(S.error, 'bad');
+  }
+  render();
+}
+
+/* ---------------- toast ---------------- */
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (type === 'bad' ? ' bad' : '');
+  t.innerHTML = icon(type === 'bad' ? 'alert' : 'check') + `<span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 380); }, type === 'bad' ? 6500 : 3200);
+}
+
+/* ---------------- nav ---------------- */
+const ROUTES = [
+  { id: 'home', th: 'หน้าหลัก', en: 'Overview', ic: 'home' },
+  { id: 'plans', th: 'แผนงานตามยุทธศาสตร์', en: 'Strategic Plans', ic: 'plans' },
+  { id: 'table', th: 'ตารางแผนปฏิบัติงาน', en: 'Action Plan Table', ic: 'table' },
+  { id: 'pdf', th: 'สร้างไฟล์ PDF', en: 'Export PDF', ic: 'pdf', action: true },
+  { id: 'settings', th: 'ตั้งค่า', en: 'Settings', ic: 'gear' }
 ];
-const EDITABLE_SETTINGS = ['unitName', 'fiscalYear', 'orgLine', 'headName', 'headPosition'];
-
-/* ===================== Web App entry ===================== */
-
-function doGet(e) {
-  try {
-    const action = (e && e.parameter && e.parameter.action) || 'getAll';
-    if (action === 'ping') return jsonOut_({ ok: true, pong: true, time: nowStr_() });
-    return jsonOut_(getAll_());
-  } catch (err) {
-    return jsonOut_({ ok: false, error: String(err && err.message || err) });
-  }
+function route() {
+  const h = (location.hash || '#home').slice(1);
+  const [id, arg] = h.split('-');
+  return { id: ROUTES.some(r => r.id === id && !r.action) ? id : 'home', arg: arg ? Number(arg) : 0 };
 }
-
-function doPost(e) {
-  try {
-    let body;
-    try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
-    catch (x) { return jsonOut_({ ok: false, error: 'ข้อมูลที่ส่งมาไม่อยู่ในรูปแบบ JSON' }); }
-    const action = body.action || 'getAll';
-    const data = body.data || {};
-    switch (action) {
-      case 'getAll': return jsonOut_(getAll_());
-      case 'saveProject': return jsonOut_(withLock_(function () { return saveProject_(data); }));
-      case 'deleteProject': return jsonOut_(withLock_(function () { return deleteProject_(data.id); }));
-      case 'saveSettings': return jsonOut_(withLock_(function () { return saveSettings_(data); }));
-      case 'saveStrategies': return jsonOut_(withLock_(function () { return saveStrategies_(data.list || []); }));
-      case 'saveStaff': return jsonOut_(withLock_(function () { return saveStaff_(data.list || []); }));
-      default: return jsonOut_({ ok: false, error: 'ไม่รู้จักคำสั่ง: ' + action });
+function renderNav() {
+  const r = route();
+  $('#nav').innerHTML = ROUTES.map(x => {
+    const active = !x.action && x.id === r.id;
+    const tag = x.action ? `<button class="nav-item" data-act="pdf">` : `<a class="nav-item${active ? ' active' : ''}" href="#${x.id}">`;
+    const end = x.action ? '</button>' : '</a>';
+    let sub = '';
+    if (x.id === 'plans' && S.data) {
+      sub = `<div class="nav-sub">${strategies().map(s => `<a href="#plans-${s.no}" class="${r.id === 'plans' && r.arg === s.no ? 'active' : ''}" title="${esc(s.name)}"><b>${pad2(s.no)}</b><span>${esc(s.name)}</span></a>`).join('')}</div>`;
     }
-  } catch (err) {
-    return jsonOut_({ ok: false, error: String(err && err.message || err) });
-  }
+    return `${tag}<span class="nav-ico">${icon(x.ic)}</span><span class="lbl"><b>${x.th}</b><small>${x.en}</small></span>${end}${sub}`;
+  }).join('');
+}
+function shortName(n) { n = String(n || ''); return n.length > 26 ? n.slice(0, 25) + '…' : n; }
+function closeNav() { document.body.classList.remove('nav-open'); }
+
+/* ---------------- unfold + tilt ---------------- */
+let unfoldObs = null;
+function observeUnfold(root, quiet) {
+  const els = root.querySelectorAll('.unfold:not(.in)');
+  if (quiet || !('IntersectionObserver' in window)) { els.forEach(e => e.classList.add('in')); return; }
+  if (!unfoldObs) unfoldObs = new IntersectionObserver(entries => {
+    let k = 0;
+    entries.forEach(en => {
+      if (!en.isIntersecting) return;
+      en.target.style.setProperty('--ud', (k++ * .09).toFixed(2) + 's');
+      en.target.classList.add('in'); unfoldObs.unobserve(en.target);
+    });
+  }, { rootMargin: '0px 0px 4% 0px', threshold: .02 });
+  els.forEach(e => unfoldObs.observe(e));
+}
+if (matchMedia('(hover:hover) and (pointer:fine)').matches) {
+  let tiltEl = null;
+  const resetTilt = el => { el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); };
+  document.addEventListener('pointermove', e => {
+    const el = e.target.closest ? e.target.closest('.tilt') : null;
+    if (tiltEl && tiltEl !== el) resetTilt(tiltEl);
+    tiltEl = el; if (!el) return;
+    const r = el.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    el.style.setProperty('--ry', ((px - .5) * 11).toFixed(2) + 'deg');
+    el.style.setProperty('--rx', ((.5 - py) * 9).toFixed(2) + 'deg');
+    el.style.setProperty('--gx', (px * 100).toFixed(1) + '%');
+    el.style.setProperty('--gy', (py * 100).toFixed(1) + '%');
+  }, { passive: true });
 }
 
-/** เรียกใช้ครั้งแรกในหน้าแก้ไขสคริปต์ เพื่อสร้างชีตและอนุญาตสิทธิ์ */
-function setup() {
-  const T = ensureSchema_();
-  Logger.log('พร้อมใช้งาน: ' + T.ss.getUrl());
-  return T.ss.getUrl();
+/* ---------------- views ---------------- */
+function render() {
+  const r = route();
+  renderNav();
+  const st = settings();
+  $('#brandUnit').textContent = st.unitName || 'หน่วยไตเทียม';
+  $('#brandFy').textContent = 'แผนปฏิบัติงาน ปีงบประมาณ ' + (st.fiscalYear || '—');
+  $('#uName').textContent = st.headName || 'อ้อมอารีย์';
+  $('#uRole').textContent = st.headPosition || 'หัวหน้าหน่วยไตเทียม';
+  $('#avatar').textContent = (st.headName || 'อ').trim().charAt(0);
+  const rt = ROUTES.find(x => x.id === r.id);
+  $('#tbTitle').textContent = rt.th; $('#tbKicker').textContent = rt.en;
+  $('#fab').classList.toggle('show', !!S.data && (r.id === 'plans' || r.id === 'home'));
+  const v = $('#view');
+  let html = '';
+  if (!S.data) html = viewNoData();
+  else if (r.id === 'plans') html = viewPlans(r.arg);
+  else if (r.id === 'table') html = viewTable();
+  else if (r.id === 'settings') html = viewSettings();
+  else html = viewHome();
+  v.innerHTML = banner() + html;
+  hydrateIcons(v);
+  observeUnfold(v, S._quiet); S._quiet = false;
+  if (r.id === 'home') { countUp(); Kidney3D.mount($('#kidneyHost')); }
+}
+function banner() {
+  if (S.online || !S.error) return '';
+  return `<div class="banner">${icon('alert')}<div><b>${S.fromCache ? 'กำลังแสดงข้อมูลล่าสุดที่เก็บไว้ในเครื่อง' : 'ยังเชื่อมต่อ Google Sheet ไม่ได้'}</b>${esc(S.error)}<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-act="sync">${icon('sync')}ลองใหม่</button> <a class="btn btn-ghost btn-sm" href="#settings">${icon('gear')}ตั้งค่าการเชื่อมต่อ</a></div></div></div>`;
+}
+function viewNoData() {
+  return `<section class="page-head reveal"><div class="kicker">ACTION PLAN</div><h2 class="gold-text">แผนปฏิบัติงาน หน่วยไตเทียม</h2>${divider()}</section>
+  <div class="frame panel reveal" style="max-width:720px;margin:0 auto">${corners()}<h3>${icon('sheet')}รอเชื่อมต่อ Google Sheet</h3>
+  <p class="hint">วาง Code.gs ในโปรเจกต์ Apps Script ที่ผูกกับ Google Sheet แล้ว Deploy เป็นเวอร์ชันใหม่ ระบบจะสร้างชีต คอลัมน์ และข้อมูลแผนตั้งต้นให้อัตโนมัติ</p>
+  <div class="btn-row"><a class="btn btn-ghost" href="#settings">${icon('gear')}ตั้งค่าการเชื่อมต่อ</a><button class="btn btn-gold" data-act="sync">${icon('sync')}เชื่อมต่ออีกครั้ง</button></div></div>`;
 }
 
-/* ===================== Schema ===================== */
-
-function getSS_() {
-  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
-  let ss = null;
-  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
-  if (ss) return ss;
-  const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('SHEET_ID');
-  if (id) return SpreadsheetApp.openById(id);
-  ss = SpreadsheetApp.create('Action Plan หน่วยไตเทียม');
-  props.setProperty('SHEET_ID', ss.getId());
-  return ss;
+function stratStats(no) {
+  const ps = projectsOf(no), fm = fiscalIdx();
+  let acts = 0, kpis = 0, now = 0;
+  ps.forEach(p => { acts += p.activities.length; kpis += kpiList(p).length; now += p.activities.filter(a => a.months[fm]).length; });
+  return { plans: ps.length, acts, kpis, now };
 }
 
-function ensureSheet_(ss, def) {
-  let sh = ss.getSheetByName(def.name);
-  let created = false;
-  if (!sh) { sh = ss.insertSheet(def.name); created = true; }
-  const lastCol = Math.max(sh.getLastColumn(), 1);
-  let header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (v) { return String(v).trim(); });
-  while (header.length && header[header.length - 1] === '') header.pop();
-  const missing = def.headers.filter(function (h) { return header.indexOf(h) === -1; });
-  if (missing.length) {
-    sh.getRange(1, header.length + 1, 1, missing.length).setValues([missing]);
-    header = header.concat(missing);
-    sh.getRange(1, 1, 1, header.length)
-      .setFontWeight('bold').setBackground('#0f2150').setFontColor('#f3d27a')
-      .setVerticalAlignment('middle').setHorizontalAlignment('center');
-    sh.setFrozenRows(1);
-  }
-  if (created) formatNewSheet_(sh, def);
-  const map = {};
-  header.forEach(function (h, i) { if (h) map[h] = i; });
-  return { sh: sh, header: header, map: map };
+function viewHome() {
+  const st = settings(), fm = fiscalIdx();
+  const strats = strategies();
+  const all = S.data.projects || [];
+  const totals = { s: strats.length, p: all.length, a: all.reduce((n, p) => n + p.activities.length, 0), k: all.reduce((n, p) => n + kpiList(p).length, 0) };
+  const nowGroups = all.map(p => ({ p, acts: p.activities.filter(a => a.months[fm]) })).filter(x => x.acts.length)
+    .sort((x, y) => (x.p.strategyNo - y.p.strategyNo) || (x.p.order - y.p.order));
+  const nowActs = nowGroups.reduce((n, g) => n + g.acts.length, 0);
+  const LIMIT = window.innerWidth < 700 ? 3 : 6;
+  const stats = [
+    ['flag', totals.s, 'ยุทธศาสตร์', 'Strategies'],
+    ['plans', totals.p, 'แผนงาน/โครงการ', 'Projects'],
+    ['calendar', totals.a, 'กิจกรรม', 'Activities'],
+    ['target', totals.k, 'ตัวชี้วัด', 'Indicators']
+  ];
+  return `
+  <section class="stage hero3d glow-run slow reveal">${corners()}
+    <span class="beam l"></span><span class="beam r"></span>
+    <div class="stage-top">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="kidney-wrap"><div class="k-glow"></div><div class="k-base"></div><div class="kidney-host" id="kidneyHost"></div></div>
+      <div class="lights r"><i></i><i></i><i></i></div>
+    </div>
+    <svg class="arc" viewBox="0 0 820 26" preserveAspectRatio="none"><path pathLength="1" d="M10 4 Q410 40 810 4"/></svg>
+    <div class="clock" data-clock>--:--:-- น.</div>
+    <h1 class="gold-text">ACTION PLAN</h1>
+    <div class="th">แผนปฏิบัติงานประจำ${esc(st.unitName || 'หน่วยไตเทียม')} ปีงบประมาณ ${esc(st.fiscalYear || '')}</div>
+    <div class="org">${esc(st.orgLine || '')}</div>
+    <div class="k-hint">ลากที่โมเดลไตเพื่อหมุนดูรอบด้าน</div>
+    <div class="scroll-hint"><span class="mouse"></span>เลื่อนลงเพื่อชมแผนงาน</div>
+  </section>
+
+  <section class="stats">${stats.map((s, i) => `
+    <div class="frame stat unfold tilt glow-run" style="--i:${i + 1}">${corners()}<span class="glare"></span>
+      <div class="s-ico">${icon(s[0])}</div>
+      <div class="num gold-text" data-count="${s[1]}">0</div>
+      <div class="lab">${s[2]}</div><div class="en">${s[3]}</div>
+    </div>`).join('')}
+  </section>
+
+  <section class="frame nowshow unfold glow-run slow">${corners()}
+    <div class="sec-title"><span class="badge">NOW SHOWING</span><h3>กิจกรรมที่ดำเนินการเดือน${MONTHS_FULL[fm]}</h3><span class="sec-count">${nowActs} กิจกรรม · ${nowGroups.length} แผนงาน</span></div>
+        ${nowGroups.length ? `<div class="now-list">${nowGroups.map((x, k) => `
+      <a class="now-item${k >= LIMIT && !S.showAllNow ? ' hidden' : ''}" href="#plans-${x.p.strategyNo}">
+        <span class="tag">${x.p.strategyNo}.${x.p.order}</span>
+        <span><div class="t2">${esc(x.p.title)}</div><ul class="t1">${x.acts.map(a => `<li>${esc(a.text)}</li>`).join('')}</ul></span>
+      </a>`).join('')}</div>
+      ${nowGroups.length > LIMIT ? `<div style="text-align:center;margin-top:12px"><button class="btn btn-ghost btn-sm" data-act="now-more">${S.showAllNow ? 'แสดงน้อยลง' : `แสดงทั้งหมด (${nowGroups.length} แผนงาน)`}</button></div>` : ''}` : `<div class="empty">ไม่มีกิจกรรมที่กำหนดไว้ในเดือนนี้</div>`}
+  </section>
+
+  <section class="page-head reveal">
+    <div class="kicker">SELECT A STRATEGY</div>
+    <h2 class="gold-text">เลือกยุทธศาสตร์</h2>
+    <p>แตะการ์ดเพื่อดูแผนงาน กิจกรรม และตัวชี้วัดของแต่ละยุทธศาสตร์</p>
+    ${divider()}
+  </section>
+  <section class="tickets">${strats.map((s, i) => ticket(s, i)).join('')}</section>`;
+}
+function ticket(s, i) {
+  const t = stratStats(s.no);
+  const hot = t.now > 0;
+  return `<div class="t-wrap unfold${hot ? ' hot' : ''}"><a class="ticket tilt${hot ? ' hot glow-run' : ''}" href="#plans-${s.no}"><span class="glare"></span>
+    <div class="stub"><span class="stub-lbl">STRATEGY</span><span class="stub-no">${pad2(s.no)}</span></div>
+    <span class="perf"></span>
+    <div class="tb">
+      <span class="t-ico">${icon(S_ICON[s.no] || 'spark')}</span>
+      <div class="t-kicker">${esc((S_EN[s.no] || 'Strategy').toUpperCase())} · <b>ยุทธศาสตร์ที่ ${s.no}</b></div>
+      <div class="t-title">${esc(s.name)}</div>
+      <div class="t-meta"><b>${t.plans}</b> แผนงาน · <b>${t.acts}</b> กิจกรรม · <b>${t.kpis}</b> ตัวชี้วัด</div>
+      ${hot ? `<span class="pill"><span class="live"></span><span class="pen">NOW SHOWING ·</span><b>เดือนนี้ ${t.now} กิจกรรม</b></span>` : ''}
+      ${t.plans === 0 ? '<span class="stamp">EMPTY</span>' : ''}
+    </div></a></div>`;
+}
+function countUp() {
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const to = Number(el.dataset.count) || 0, t0 = performance.now(), dur = 1100;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(to * e);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
 }
 
-function formatNewSheet_(sh, def) {
-  try {
-    (def.widths || []).forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
-    const rows = Math.max(sh.getMaxRows() - 1, 1);
-    if (def.wrap) sh.getRange(2, 1, rows, def.headers.length).setWrap(true).setVerticalAlignment('top');
-    if (def.centerFrom) {
-      sh.getRange(2, def.centerFrom, rows, def.headers.length - def.centerFrom + 1).setHorizontalAlignment('center');
-    }
-  } catch (e) { /* การจัดรูปแบบไม่จำเป็นต่อการทำงาน */ }
+function viewPlans(arg) {
+  const f = S.filter;
+  if (arg) f.s = arg;
+  const q = f.q.trim().toLowerCase();
+  const strats = strategies().filter(s => !f.s || s.no === f.s);
+  const fm = fiscalIdx();
+  let gi = 0;
+  const groups = strats.map(s => {
+    let ps = projectsOf(s.no);
+    if (q) ps = ps.filter(p => [p.title, p.indicators, p.responsible, p.budget, ...p.activities.map(a => a.text)].join(' ').toLowerCase().includes(q));
+    if (q && !ps.length) return '';
+    return `<section class="group" id="g${s.no}">
+      <div class="group-head reveal" style="--i:${gi++}">
+        <div class="g-no"><span><small>STRATEGY</small>${pad2(s.no)}</span></div>
+        <div class="g-txt"><div class="k">${esc((S_EN[s.no] || 'Strategy').toUpperCase())}</div><h3>ยุทธศาสตร์ที่ ${s.no}: ${esc(s.name)}</h3></div>
+        <span class="g-line"></span>
+        <button class="btn btn-ghost btn-sm" data-act="add" data-s="${s.no}">${icon('plus')}เพิ่ม</button>
+      </div>
+      <div class="plan-grid">${ps.length ? ps.map(p => planCard(p, fm, gi++)).join('') : `<div class="frame panel empty">${corners()}ยังไม่มีแผนงานในยุทธศาสตร์นี้ — กด “เพิ่ม” เพื่อสร้างแผนงานแรก</div>`}</div>
+    </section>`;
+  }).join('');
+  return `
+  <section class="page-head reveal"><div class="kicker">STRATEGIC PLANS</div><h2 class="gold-text">แผนงานตามยุทธศาสตร์</h2><p>ปีงบประมาณ ${esc(settings().fiscalYear || '')} · เพิ่ม แก้ไข หรือลบแผนงานได้ทันที ข้อมูลบันทึกลง Google Sheet</p>${divider()}</section>
+  <div class="toolbar reveal">
+    <div class="chips">
+      <button class="chip${!f.s ? ' on' : ''}" data-act="filter" data-s="0">ทั้งหมด</button>
+      ${strategies().map(s => `<button class="chip${f.s === s.no ? ' on' : ''}" data-act="filter" data-s="${s.no}"><b>${pad2(s.no)}</b>${esc(shortName(s.name).slice(0, 18))}${s.name.length > 18 ? '…' : ''}</button>`).join('')}
+    </div>
+    <label class="search">${icon('search')}<input id="q" type="search" placeholder="ค้นหาแผนงาน กิจกรรม ตัวชี้วัด…" value="${esc(f.q)}"></label>
+    <button class="btn btn-gold" data-act="add" data-s="${f.s || ''}">${icon('plus')}เพิ่มแผนงาน</button>
+  </div>
+  ${groups || `<div class="frame panel empty">${corners()}ไม่พบแผนงานที่ตรงกับคำค้น</div>`}`;
+}
+function planCard(p, fm, i) {
+  const kp = kpiList(p), rs = respList(p);
+  return `<article class="frame plan unfold glow-run glow-hover">${corners()}
+    <div class="plan-head">
+      <div class="plan-no"><small>PLAN</small>${p.strategyNo}.${p.order}</div>
+      <h4>${esc(p.title)}</h4>
+      <div class="plan-actions">
+        <button class="icon-btn" data-act="edit" data-id="${esc(p.id)}" title="แก้ไข" aria-label="แก้ไข">${icon('edit')}</button>
+        <button class="icon-btn del" data-act="del" data-id="${esc(p.id)}" title="ลบ" aria-label="ลบ">${icon('trash')}</button>
+      </div>
+    </div>
+    <div class="meta">
+      <span>${icon('coins')}งบประมาณ: ${esc(p.budget || '—')}</span>
+      <span>${icon('users')}${rs.length ? rs.map(esc).join(', ') : 'ยังไม่ระบุผู้รับผิดชอบ'}</span>
+    </div>
+    <div class="sub-h">ACTIVITIES <b>กิจกรรมและระยะเวลาดำเนินงาน</b></div>
+    <div class="gantt">
+      <div class="g-row hdr"><span></span><div class="months mhead">${MONTHS.map((m, k) => `<span class="mc${k === fm ? ' now' : ''}">${m}</span>`).join('')}</div></div>
+      ${p.activities.length ? p.activities.map((a, k) => `
+      <div class="g-row"><div class="a-txt"><i>${k + 1}</i><span>${esc(a.text)}</span></div>
+        <div class="months" title="${esc(runs(a.months).map(r => MONTHS[r[0]] + (r[1] > r[0] ? '–' + MONTHS[r[1]] : '')).join(', ') || 'ยังไม่กำหนดเดือน')}">
+          ${MONTHS.map((m, j) => `<span class="mc${j === fm ? ' now' : ''}" style="grid-column:${j + 1}"></span>`).join('')}
+          ${runs(a.months).map(r => `<span class="bar" style="grid-column:${r[0] + 1}/${r[1] + 2};--i:${k}"></span>`).join('')}
+        </div></div>`).join('') : '<div class="empty">ยังไม่มีกิจกรรม</div>'}
+    </div>
+    <div class="sub-h">INDICATORS <b>ผลผลิต/ตัวชี้วัด</b></div>
+    ${kp.length ? `<ul class="kpis">${kp.map(k => `<li>${icon('target')}<span>${esc(k)}</span></li>`).join('')}</ul>` : '<div class="empty">ยังไม่มีตัวชี้วัด</div>'}
+    ${p.updatedAt ? `<div class="plan-foot">แก้ไขล่าสุด ${esc(fmtUpdated(p.updatedAt))}</div>` : ''}
+  </article>`;
 }
 
-function ensureSchema_() {
-  const ss = getSS_();
-  const T = { ss: ss };
-  Object.keys(SHEETS).forEach(function (k) { T[k] = ensureSheet_(ss, SHEETS[k]); });
-
-  // ค่าตั้งต้นที่ยังไม่มี
-  const keys = readRows_(T.settings).map(function (r) { return String(r[T.settings.map['คีย์']]).trim(); });
-  const addSettings = SETTING_DEFAULTS.filter(function (d) { return keys.indexOf(d[0]) === -1; })
-    .map(function (d) { return rowFrom_(T.settings, { 'คีย์': d[0], 'ค่า': d[1], 'คำอธิบาย': d[2] }); });
-  appendRows_(T.settings, addSettings);
-
-  if (readRows_(T.strategies).length === 0) {
-    appendRows_(T.strategies, SEED_STRATEGIES.map(function (s, i) {
-      return rowFrom_(T.strategies, { 'ลำดับ': i + 1, 'ชื่อยุทธศาสตร์': s });
-    }));
-  }
-  if (readRows_(T.staff).length === 0) {
-    appendRows_(T.staff, SEED_STAFF.map(function (s, i) {
-      return rowFrom_(T.staff, { 'ลำดับ': i + 1, 'ชื่อ': s[0], 'ตำแหน่ง': s[1] });
-    }));
-  }
-
-  const settings = readSettings_(T);
-  if (settings.seeded !== 'yes') {
-    if (readRows_(T.projects).length === 0) seedProjects_(T);
-    setSetting_(T, 'seeded', 'yes');
-  }
-  return T;
-}
-
-/* ===================== Read ===================== */
-
-function getAll_(T) {
-  T = T || ensureSchema_();
-  const settings = readSettings_(T);
-  delete settings.seeded;
-
-  const sm = T.strategies.map;
-  const strategies = readRows_(T.strategies)
-    .map(function (r) { return { no: toNum_(r[sm['ลำดับ']]), name: toStr_(r[sm['ชื่อยุทธศาสตร์']]) }; })
-    .filter(function (s) { return s.name; })
-    .sort(function (a, b) { return a.no - b.no; });
-
-  const fm = T.staff.map;
-  const staff = readRows_(T.staff)
-    .map(function (r) { return { order: toNum_(r[fm['ลำดับ']]), name: toStr_(r[fm['ชื่อ']]), position: toStr_(r[fm['ตำแหน่ง']]) }; })
-    .filter(function (s) { return s.name; })
-    .sort(function (a, b) { return a.order - b.order; });
-
-  const am = T.activities.map;
-  const actsByProject = {};
-  readRows_(T.activities).forEach(function (r) {
-    const pid = toStr_(r[am['รหัสแผนงาน']]);
-    if (!pid) return;
-    (actsByProject[pid] = actsByProject[pid] || []).push({
-      id: toStr_(r[am['รหัสกิจกรรม']]),
-      order: toNum_(r[am['ลำดับ']]),
-      text: toStr_(r[am['กิจกรรม']]),
-      months: MONTHS.map(function (m) { return isOn_(r[am[m]]); })
+function viewTable() {
+  const st = settings();
+  let body = '';
+  strategies().forEach(s => {
+    body += `<tr class="s-row"><td colspan="${5 + 12}">ยุทธศาสตร์ที่ ${s.no}: ${esc(s.name)}</td></tr>`;
+    projectsOf(s.no).forEach(p => {
+      const acts = p.activities.length ? p.activities : [{ text: '', months: [] }];
+      const kp = kpiList(p), rs = respList(p), n = acts.length;
+      acts.forEach((a, i) => {
+        const cells = MONTHS.map((m, j) => {
+          const on = !!a.months[j];
+          if (!on) return '<td class="m"></td>';
+          const isSt = !a.months[j - 1], isEn = !a.months[j + 1];
+          return `<td class="m on${isSt ? ' st' : ''}${isEn ? ' en' : ''}"><span class="ln"></span>${isSt ? '<span class="ah l"></span>' : ''}${isEn ? '<span class="ah r"></span>' : ''}</td>`;
+        }).join('');
+        body += `<tr>${i === 0 ? `<td rowspan="${n}">${p.order}. ${esc(p.title)}</td>` : ''}<td>${a.text ? `${i + 1}. ${esc(a.text)}` : ''}</td>${i === 0 ? `
+          <td rowspan="${n}" class="kpi">${kp.map((k, j) => `<div>${kp.length > 1 ? (j + 1) + '. ' : ''}${esc(k)}</div>`).join('')}</td>
+          <td rowspan="${n}">${esc(p.budget || '')}</td>
+          <td rowspan="${n}">${rs.map(esc).join('<br>')}</td>` : ''}${cells}</tr>`;
+      });
     });
   });
+  return `
+  <section class="page-head reveal"><div class="kicker">ACTION PLAN TABLE</div><h2 class="gold-text">ตารางแผนปฏิบัติงาน</h2><p>มุมมองเอกสารตามแบบฟอร์มของกลุ่มการพยาบาล ใช้ตรวจทานก่อนสร้างไฟล์ PDF</p>${divider()}</section>
+  <div class="doc-actions reveal"><button class="btn btn-gold" data-act="pdf">${icon('pdf')}สร้างไฟล์ PDF</button><a class="btn btn-ghost" href="#plans">${icon('edit')}ไปหน้าแก้ไขแผนงาน</a></div>
+  <div class="paper reveal" style="--i:1">${corners(true)}
+    <div class="doc-title"><h3>แผนปฏิบัติงานประจำ${esc(st.unitName || '')}</h3><p>ปีงบประมาณ ${esc(st.fiscalYear || '')} &nbsp;${esc(st.orgLine || '')}</p></div>
+    <div class="doc-scroll"><table class="doc">
+      <colgroup><col style="width:15%"><col style="width:21%"><col style="width:21%"><col style="width:7%"><col style="width:8%">${MONTHS.map(() => '<col>').join('')}</colgroup>
+      <thead><tr><th rowspan="2">เป้าประสงค์/ยุทธศาสตร์</th><th rowspan="2">กิจกรรม</th><th rowspan="2">ผลผลิต/ตัวชี้วัด</th><th rowspan="2">งบประมาณ</th><th rowspan="2">ผู้รับผิดชอบ</th><th colspan="12">ระยะเวลาดำเนินงาน</th></tr>
+      <tr>${MONTHS.map(m => `<th>${m}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>
+  </div>`;
+}
 
-  const pm = T.projects.map;
-  const projects = readRows_(T.projects)
-    .map(function (r) {
-      const id = toStr_(r[pm['รหัสแผนงาน']]);
-      return {
-        id: id,
-        strategyNo: toNum_(r[pm['ยุทธศาสตร์ที่']]),
-        order: toNum_(r[pm['ลำดับ']]),
-        title: toStr_(r[pm['เป้าประสงค์/โครงการ']]),
-        indicators: toStr_(r[pm['ผลผลิต/ตัวชี้วัด']]),
-        budget: toStr_(r[pm['งบประมาณ']]),
-        responsible: toStr_(r[pm['ผู้รับผิดชอบ']]),
-        createdAt: fmtDate_(r[pm['วันที่บันทึก']]),
-        updatedAt: fmtDate_(r[pm['วันที่แก้ไข']]),
-        activities: (actsByProject[id] || []).sort(function (a, b) { return a.order - b.order; })
-      };
-    })
-    .filter(function (p) { return p.id; })
-    .sort(function (a, b) { return (a.strategyNo - b.strategyNo) || (a.order - b.order); });
+function viewSettings() {
+  const st = settings(), d = S.data;
+  return `
+  <section class="page-head reveal"><div class="kicker">SETTINGS</div><h2 class="gold-text">ตั้งค่า</h2><p>ข้อมูลหัวเอกสาร ยุทธศาสตร์ บุคลากร และการเชื่อมต่อ Google Sheet</p>${divider()}</section>
+  <div class="set-grid">
+    <form class="frame panel unfold glow-run glow-hover" id="fUnit" style="--i:1">${corners()}
+      <h3>${icon('home')}ข้อมูลหน่วยงาน</h3><p class="hint">ใช้แสดงบนหัวเอกสารและไฟล์ PDF</p>
+      <div class="row2">
+        <div class="field"><label>ชื่อหน่วยงาน</label><input class="inp" name="unitName" value="${esc(st.unitName || '')}"></div>
+        <div class="field"><label>ปีงบประมาณ</label><input class="inp" name="fiscalYear" inputmode="numeric" value="${esc(st.fiscalYear || '')}"></div>
+      </div>
+      <div class="field"><label>สังกัด</label><input class="inp" name="orgLine" value="${esc(st.orgLine || '')}"></div>
+      <div class="row2">
+        <div class="field"><label>หัวหน้าหน่วยงาน</label><input class="inp" name="headName" value="${esc(st.headName || '')}"></div>
+        <div class="field"><label>ตำแหน่ง</label><input class="inp" name="headPosition" value="${esc(st.headPosition || '')}"></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-gold" type="submit">${icon('save')}บันทึก</button></div>
+    </form>
 
+    <form class="frame panel unfold glow-run glow-hover" id="fConn" style="--i:2">${corners()}
+      <h3>${icon('link')}การเชื่อมต่อ Google Sheet</h3><p class="hint">URL ของ Apps Script Web App (ลงท้ายด้วย /exec)</p>
+      <div class="field"><textarea class="inp url-box" name="url" rows="3">${esc(S.apiUrl)}</textarea></div>
+      <div class="conn" style="margin:0 0 14px"><span class="dot ${S.online ? 'ok' : (S.error ? 'bad' : '')}"></span><span>${S.online ? 'เชื่อมต่อแล้ว · ซิงก์ล่าสุด ' + esc(d.serverTime || '') : (S.error ? 'เชื่อมต่อไม่สำเร็จ' : 'ยังไม่เชื่อมต่อ')}</span></div>
+      <div class="btn-row">
+        ${d.sheetUrl ? `<a class="btn btn-ghost" href="${esc(d.sheetUrl)}" target="_blank" rel="noopener">${icon('sheet')}เปิด Google Sheet</a>` : ''}
+        <button class="btn btn-ghost" type="button" data-act="url-default">ค่าเริ่มต้น</button>
+        <button class="btn btn-gold" type="submit">${icon('sync')}บันทึกและเชื่อมต่อ</button>
+      </div>
+    </form>
+
+    <form class="frame panel unfold glow-run glow-hover" id="fStrat" style="--i:3">${corners()}
+      <h3>${icon('flag')}ยุทธศาสตร์</h3><p class="hint">ลำดับและชื่อยุทธศาสตร์ของกลุ่มการพยาบาล</p>
+      <div class="list-ed" id="stratList">${strategies().map(s => stratRow(s)).join('')}</div>
+      <div class="btn-row"><button class="btn btn-ghost" type="button" data-act="strat-add">${icon('plus')}เพิ่มยุทธศาสตร์</button><button class="btn btn-gold" type="submit">${icon('save')}บันทึก</button></div>
+    </form>
+
+    <form class="frame panel unfold glow-run glow-hover" id="fStaff" style="--i:4">${corners()}
+      <h3>${icon('users')}บุคลากร / ผู้รับผิดชอบ</h3><p class="hint">รายชื่อนี้จะแสดงเป็นตัวเลือกผู้รับผิดชอบในแต่ละแผนงาน</p>
+      <div class="list-ed" id="staffList">${(d.staff || []).map(s => staffRow(s)).join('')}</div>
+      <div class="btn-row"><button class="btn btn-ghost" type="button" data-act="staff-add">${icon('plus')}เพิ่มบุคลากร</button><button class="btn btn-gold" type="submit">${icon('save')}บันทึก</button></div>
+    </form>
+  </div>`;
+}
+const stratRow = s => `<div class="le-row"><input class="inp" name="no" inputmode="numeric" value="${esc(s.no || '')}" aria-label="ลำดับ"><textarea class="inp" name="name" rows="2" aria-label="ชื่อยุทธศาสตร์">${esc(s.name || '')}</textarea><button type="button" class="icon-btn del" data-act="row-del" title="ลบ">${icon('trash')}</button></div>`;
+const staffRow = s => `<div class="le-row staff"><input class="inp" name="name" value="${esc(s.name || '')}" placeholder="ชื่อ"><input class="inp" name="position" value="${esc(s.position || '')}" placeholder="ตำแหน่ง"><button type="button" class="icon-btn del" data-act="row-del" title="ลบ">${icon('trash')}</button></div>`;
+
+/* ---------------- modal ---------------- */
+function openModal(html, cls = '') {
+  const w = document.createElement('div');
+  w.className = 'modal-wrap';
+  w.innerHTML = `<div class="modal glow-run slow ${cls}" role="dialog" aria-modal="true">${corners(true)}${html}</div>`;
+  $('#modalRoot').appendChild(w);
+  hydrateIcons(w);
+  document.body.style.overflow = 'hidden';
+  w.addEventListener('mousedown', e => { if (e.target === w && !w.dataset.busy) closeModal(w); });
+  return w;
+}
+function closeModal(w) {
+  w = w || $('#modalRoot .modal-wrap:last-child');
+  if (!w) return;
+  w.classList.add('out');
+  setTimeout(() => { w.remove(); if (!$('#modalRoot .modal-wrap')) document.body.style.overflow = ''; }, 220);
+}
+function confirmBox(title, msg, okText = 'ยืนยัน', danger) {
+  return new Promise(res => {
+    const w = openModal(`<div class="m-head"><div class="deco">CONFIRM</div><h3>${esc(title)}</h3></div>${divider(true)}
+      <div class="m-body" style="text-align:center">${msg}</div>
+      <div class="m-foot"><button class="btn btn-line" data-r="0">ยกเลิก</button><button class="btn ${danger ? 'btn-danger' : 'btn-gold'}" data-r="1">${okText}</button></div>`, 'sm');
+    w.dataset.busy = '1';
+    w.addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (b) { delete w.dataset.busy; closeModal(w); res(b.dataset.r === '1'); } });
+  });
+}
+
+/* ---------------- editor ---------------- */
+let ED = null;
+function openEditor(p, presetS) {
+  const isNew = !p;
+  p = p ? JSON.parse(JSON.stringify(p)) : { id: '', strategyNo: presetS || (S.filter.s || 1), order: 0, title: '', indicators: '', budget: '', responsible: '', activities: [{ text: '', months: Array(12).fill(false) }] };
+  if (isNew) p.order = projectsOf(p.strategyNo).reduce((m, x) => Math.max(m, x.order), 0) + 1;
+  p.activities = p.activities.map(a => ({ id: a.id || '', text: a.text || '', months: MONTHS.map((m, i) => !!(a.months && a.months[i])) }));
+  ED = { p, isNew, resp: respList(p) };
+  const staffNames = (S.data.staff || []).map(s => s.name);
+  const extraResp = ED.resp.filter(r => !staffNames.includes(r));
+  const w = openModal(`
+    <div class="m-head"><div class="deco">${isNew ? 'NEW PLAN' : 'EDIT PLAN'}</div><h3>${isNew ? 'เพิ่มแผนงาน' : 'แก้ไขแผนงาน'}</h3></div>
+    ${divider(true)}
+    <form class="m-body" id="edForm" autocomplete="off">
+      <div class="ed-grid">
+        <div class="field"><label>ยุทธศาสตร์</label><select class="inp" name="strategyNo">${strategies().map(s => `<option value="${s.no}"${s.no === p.strategyNo ? ' selected' : ''}>ยุทธศาสตร์ที่ ${s.no}: ${esc(s.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>ลำดับ</label><input class="inp" name="order" type="number" min="1" value="${p.order}"></div>
+      </div>
+      <div class="field"><label>เป้าประสงค์ / โครงการ <span style="color:#b23a3a">*</span></label><textarea class="inp" name="title" rows="2" placeholder="เช่น พัฒนาแนวทางเฝ้าระวังและป้องกันการติดเชื้อ…">${esc(p.title)}</textarea><div class="err" id="errTitle" hidden>กรุณาระบุเป้าประสงค์/โครงการ</div></div>
+      <div class="field"><label>กิจกรรม และเดือนที่ดำเนินการ (ปีงบประมาณ ต.ค.–ก.ย.)</label><div id="actList"></div>
+        <button type="button" class="btn btn-line btn-sm" data-act="act-add" style="align-self:flex-start">${icon('plus')}เพิ่มกิจกรรม</button></div>
+      <div class="field"><label>ผลผลิต / ตัวชี้วัด (1 บรรทัด ต่อ 1 ตัวชี้วัด)</label><textarea class="inp" name="indicators" rows="4" placeholder="ร้อยละของการปฏิบัติตามแนวทางการพยาบาล (เป้าหมาย: ≥ 90%)">${esc(p.indicators)}</textarea></div>
+      <div class="row2">
+        <div class="field"><label>งบประมาณ</label><input class="inp" name="budget" list="budgetList" value="${esc(p.budget)}" placeholder="ไม่มี / งบหน่วยงาน / จำนวนเงิน">
+          <datalist id="budgetList"><option value="ไม่มี"><option value="งบหน่วยงาน"><option value="งบประมาณประจำปี"><option value="ตามแผนกลุ่มการพยาบาล"></datalist></div>
+        <div class="field"><label>ผู้รับผิดชอบ</label>
+          <div class="resp-chips">${staffNames.map(n => `<button type="button" class="rchip${ED.resp.includes(n) ? ' on' : ''}" data-act="resp" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+          <input class="inp" name="respExtra" value="${esc(extraResp.join(', '))}" placeholder="อื่น ๆ (คั่นด้วยเครื่องหมายจุลภาค)"></div>
+      </div>
+    </form>
+    <div class="m-foot"><button class="btn btn-line" data-act="ed-cancel">ยกเลิก</button><button class="btn btn-navy" data-act="ed-save">${icon('save')}บันทึกลง Google Sheet</button></div>`);
+  w.id = 'editor';
+  renderActs();
+  setTimeout(() => { const t = $('#edForm [name="title"]'); if (t && isNew) t.focus(); }, 80);
+}
+function readActsFromDom() {
+  document.querySelectorAll('#actList .act-ed').forEach((el, i) => { if (ED.p.activities[i]) ED.p.activities[i].text = el.querySelector('textarea').value; });
+}
+function renderActs() {
+  const box = $('#actList'); if (!box) return;
+  box.innerHTML = ED.p.activities.map((a, i) => `
+    <div class="act-ed" data-i="${i}">
+      <div class="act-top">
+        <span class="act-no">${i + 1}</span>
+        <textarea class="inp" rows="2" placeholder="รายละเอียดกิจกรรม">${esc(a.text)}</textarea>
+        <div class="act-tools">
+          <button type="button" class="mini" data-act="act-up" title="เลื่อนขึ้น"${i === 0 ? ' disabled' : ''}>${icon('up')}</button>
+          <button type="button" class="mini" data-act="act-down" title="เลื่อนลง"${i === ED.p.activities.length - 1 ? ' disabled' : ''}>${icon('down')}</button>
+          <button type="button" class="mini del" data-act="act-del" title="ลบกิจกรรม">${icon('trash')}</button>
+        </div>
+      </div>
+      <div class="mchips">${MONTHS.map((m, j) => `<button type="button" class="mchip${a.months[j] ? ' on' : ''}" data-act="mon" data-j="${j}">${m}</button>`).join('')}</div>
+      <div class="mquick"><button type="button" data-act="mon-all">ทั้งปี</button><button type="button" data-act="mon-q">ทุก 3 เดือน</button><button type="button" data-act="mon-clear">ล้าง</button></div>
+    </div>`).join('');
+}
+async function saveEditor(btn) {
+  readActsFromDom();
+  const f = $('#edForm');
+  const title = fv(f, 'title').value.trim();
+  $('#errTitle').hidden = !!title;
+  if (!title) { fv(f, 'title').focus(); return; }
+  const extra = fv(f, 'respExtra').value.split(/\s*[,，、]\s*/).map(s => s.trim()).filter(Boolean);
+  const uniq = [...new Set([...ED.resp.filter(r => (S.data.staff || []).some(s => s.name === r)), ...extra])];
+  const p = {
+    id: ED.p.id, strategyNo: Number(fv(f, 'strategyNo').value), order: Number(fv(f, 'order').value) || 1,
+    title, indicators: fv(f, 'indicators').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).join('\n'),
+    budget: fv(f, 'budget').value.trim(), responsible: uniq.join(', '),
+    activities: ED.p.activities.filter(a => a.text.trim()).map(a => ({ id: a.id, text: a.text.trim(), months: a.months }))
+  };
+  const w = $('#editor');
+  w.dataset.busy = '1';
+  btn.disabled = true; const old = btn.innerHTML; btn.innerHTML = '<span class="spinner"></span>กำลังบันทึก…';
+  setConn('busy', 'กำลังบันทึก…');
+  try {
+    const d = await api('saveProject', p);
+    applyData(d); S.online = true; S.error = '';
+    setConn('ok', 'เชื่อมต่อ Google Sheet แล้ว');
+    delete w.dataset.busy; closeModal(w);
+    toast(ED.isNew ? 'เพิ่มแผนงานลง Google Sheet แล้ว' : 'บันทึกการแก้ไขลง Google Sheet แล้ว');
+    S._quiet = true; render();
+  } catch (err) {
+    delete w.dataset.busy; btn.disabled = false; btn.innerHTML = old;
+    setConn('bad', 'บันทึกไม่สำเร็จ');
+    toast(err.message || String(err), 'bad');
+  }
+}
+
+/* ---------------- settings actions ---------------- */
+async function saveForm(kind, form) {
+  const btn = form.querySelector('[type=submit]');
+  const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>กำลังบันทึก…';
+  setConn('busy', 'กำลังบันทึก…');
+  try {
+    let d;
+    if (kind === 'unit') {
+      const o = {}; ['unitName','fiscalYear','orgLine','headName','headPosition'].forEach(k => o[k] = fv(form, k).value.trim());
+      d = await api('saveSettings', o);
+    } else if (kind === 'strat') {
+      const list = [...form.querySelectorAll('.le-row')].map(r => ({ no: Number(r.querySelector('[name=no]').value), name: r.querySelector('[name=name]').value.trim() })).filter(s => s.name);
+      const nos = list.map(s => s.no);
+      if (nos.some(n => !n)) throw new Error('กรุณาระบุลำดับยุทธศาสตร์เป็นตัวเลข');
+      if (new Set(nos).size !== nos.length) throw new Error('ลำดับยุทธศาสตร์ซ้ำกัน');
+      const used = [...new Set((S.data.projects || []).map(p => p.strategyNo))].filter(n => !nos.includes(n));
+      if (used.length) throw new Error('ยุทธศาสตร์ที่ ' + used.join(', ') + ' ยังมีแผนงานอยู่ กรุณาย้ายหรือลบแผนงานก่อน');
+      d = await api('saveStrategies', { list });
+    } else if (kind === 'staff') {
+      const list = [...form.querySelectorAll('.le-row')].map(r => ({ name: r.querySelector('[name=name]').value.trim(), position: r.querySelector('[name=position]').value.trim() })).filter(s => s.name);
+      d = await api('saveStaff', { list });
+    }
+    applyData(d); S.online = true; S.error = '';
+    setConn('ok', 'เชื่อมต่อ Google Sheet แล้ว');
+    toast('บันทึกลง Google Sheet แล้ว');
+    S._quiet = true; render();
+  } catch (err) {
+    btn.disabled = false; btn.innerHTML = old;
+    setConn(S.online ? 'ok' : 'bad', S.online ? 'เชื่อมต่อ Google Sheet แล้ว' : 'เชื่อมต่อไม่สำเร็จ');
+    toast(err.message || String(err), 'bad');
+    hydrateIcons(form);
+  }
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-act]');
+  if (!t) {
+    if (e.target.closest('.nav-item, .nav-sub a')) closeNav();
+    return;
+  }
+  const act = t.dataset.act;
+  const find = id => (S.data.projects || []).find(p => p.id === id);
+  switch (act) {
+    case 'toggle-nav': document.body.classList.toggle('nav-open'); break;
+    case 'sync': load(false); break;
+    case 'now-more': S.showAllNow = !S.showAllNow; S._quiet = true; render(); break;
+    case 'filter': S._quiet = true; S.filter.s = Number(t.dataset.s) || 0; if (location.hash !== '#plans') { history.replaceState(null, '', '#plans'); } render(); break;
+    case 'add': if (S.data) openEditor(null, Number(t.dataset.s) || 0); break;
+    case 'edit': openEditor(find(t.dataset.id)); break;
+    case 'del': {
+      const p = find(t.dataset.id); if (!p) break;
+      const ok = await confirmBox('ลบแผนงานนี้?', `<p style="margin:0 0 6px"><b>${p.strategyNo}.${p.order} ${esc(p.title)}</b></p><p style="margin:0;color:#6b7394">กิจกรรม ${p.activities.length} รายการจะถูกลบออกจาก Google Sheet ด้วย</p>`, 'ลบแผนงาน', true);
+      if (!ok) break;
+      setConn('busy', 'กำลังลบ…');
+      try { applyData(await api('deleteProject', { id: p.id })); S.online = true; setConn('ok', 'เชื่อมต่อ Google Sheet แล้ว'); toast('ลบแผนงานแล้ว'); S._quiet = true; render(); }
+      catch (err) { setConn('bad', 'ลบไม่สำเร็จ'); toast(err.message, 'bad'); }
+      break;
+    }
+    case 'pdf': closeNav(); makePdf(); break;
+    case 'ed-cancel': closeModal($('#editor')); break;
+    case 'ed-save': saveEditor(t); break;
+    case 'resp': { const n = t.dataset.n; ED.resp = ED.resp.includes(n) ? ED.resp.filter(x => x !== n) : [...ED.resp, n]; t.classList.toggle('on'); break; }
+    case 'act-add': readActsFromDom(); ED.p.activities.push({ id: '', text: '', months: Array(12).fill(false) }); renderActs(); setTimeout(() => { const l = $('#actList .act-ed:last-child textarea'); l && l.focus(); }, 30); break;
+    case 'act-del': case 'act-up': case 'act-down': case 'mon': case 'mon-all': case 'mon-q': case 'mon-clear': {
+      readActsFromDom();
+      const i = Number(t.closest('.act-ed').dataset.i), A = ED.p.activities;
+      if (act === 'act-del') { A.splice(i, 1); if (!A.length) A.push({ id: '', text: '', months: Array(12).fill(false) }); }
+      if (act === 'act-up' && i > 0) [A[i - 1], A[i]] = [A[i], A[i - 1]];
+      if (act === 'act-down' && i < A.length - 1) [A[i + 1], A[i]] = [A[i], A[i + 1]];
+      if (act === 'mon') { const j = Number(t.dataset.j); A[i].months[j] = !A[i].months[j]; t.classList.toggle('on'); break; }
+      if (act === 'mon-all') A[i].months = Array(12).fill(true);
+      if (act === 'mon-q') A[i].months = MONTHS.map((m, j) => j % 3 === 2);
+      if (act === 'mon-clear') A[i].months = Array(12).fill(false);
+      renderActs(); break;
+    }
+    case 'url-default': { fv($('#fConn'), 'url').value = DEFAULT_API_URL; break; }
+    case 'strat-add': { const l = $('#stratList'); const n = Math.max(0, ...[...l.querySelectorAll('[name=no]')].map(i => Number(i.value) || 0)) + 1; l.insertAdjacentHTML('beforeend', stratRow({ no: n, name: '' })); hydrateIcons(l); l.lastElementChild.querySelector('textarea').focus(); break; }
+    case 'staff-add': { const l = $('#staffList'); l.insertAdjacentHTML('beforeend', staffRow({})); hydrateIcons(l); l.lastElementChild.querySelector('input').focus(); break; }
+    case 'row-del': t.closest('.le-row').remove(); break;
+  }
+});
+document.addEventListener('submit', e => {
+  const f = e.target; e.preventDefault();
+  if (f.id === 'fUnit') saveForm('unit', f);
+  else if (f.id === 'fStrat') saveForm('strat', f);
+  else if (f.id === 'fStaff') saveForm('staff', f);
+  else if (f.id === 'fConn') {
+    const u = fv(f, 'url').value.trim();
+    if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) { toast('URL ต้องเป็นลิงก์ Apps Script Web App (https://script.google.com/…/exec)', 'bad'); return; }
+    S.apiUrl = u; lsSet(LS_API, u === DEFAULT_API_URL ? null : u); load(false);
+  }
+});
+let qTimer;
+document.addEventListener('input', e => {
+  if (e.target.id === 'q') {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(() => {
+      S.filter.q = e.target.value; S._quiet = true;
+      const pos = e.target.selectionStart; render();
+      const q = $('#q'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (x) {} }
+    }, 260);
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { const w = $('#modalRoot .modal-wrap:last-child'); if (w && !w.dataset.busy) closeModal(w); else closeNav(); } });
+$('#scrim').addEventListener('click', closeNav);
+window.addEventListener('hashchange', () => { const r = route(); if (r.id === 'plans') S.filter.s = r.arg || 0; closeNav(); render(); window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' }); });
+
+/* ---------------- clock ---------------- */
+function tick() {
+  const d = new Date();
+  const s = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())} น.`;
+  $('#tbClock').textContent = s;
+  document.querySelectorAll('[data-clock]').forEach(el => el.textContent = s);
+}
+
+/* =========================================================
+   PDF (สร้างบนเครื่องผู้ใช้ ไม่ต้องใช้ไลบรารีภายนอก)
+   ========================================================= */
+const PDF_FONT = "'Sarabun','Tahoma','Leelawadee UI','Noto Sans Thai','Loma',sans-serif";
+const PG = { W: 841.89, H: 595.28, M: 22, S: 2.6, FS: 9, LH: 13, PX: 3.4, PY: 3 };
+const segW = (typeof Intl !== 'undefined' && Intl.Segmenter) ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+const segG = (typeof Intl !== 'undefined' && Intl.Segmenter) ? new Intl.Segmenter('th', { granularity: 'grapheme' }) : null;
+const pfont = (w, s) => `${w} ${s}px ${PDF_FONT}`;
+
+function wrapText(ctx, text, maxW) {
+  const out = [];
+  String(text == null ? '' : text).split(/\r?\n/).forEach(par => {
+    if (!par.trim()) return;
+    const words = segW ? Array.from(segW.segment(par), x => x.segment) : par.split(/(\s+)/).filter(Boolean);
+    let line = '';
+    const pushLong = w => {
+      const gs = segG ? Array.from(segG.segment(w), x => x.segment) : Array.from(w);
+      for (const g of gs) {
+        if (line && ctx.measureText(line + g).width > maxW) { out.push(line); line = g.trimStart(); }
+        else line += g;
+      }
+    };
+    for (const w of words) {
+      if (!line && !w.trim()) continue;
+      if (ctx.measureText(line + w).width <= maxW) { line += w; continue; }
+      if (line.trim()) { out.push(line.trimEnd()); line = ''; }
+      const ww = w.trimStart();
+      if (ctx.measureText(ww).width > maxW) pushLong(ww); else line = ww;
+    }
+    if (line.trim()) out.push(line.trimEnd());
+  });
+  return out;
+}
+
+function pdfColumns() {
+  const CW = PG.W - PG.M * 2;
+  const fixed = [['goal', 128], ['act', 178], ['kpi', 172], ['budget', 58], ['resp', 66]];
+  const mw = (CW - fixed.reduce((s, c) => s + c[1], 0)) / 12;
+  const C = {}; let x = PG.M;
+  fixed.forEach(([k, w]) => { C[k] = { x, w }; x += w; });
+  C.months = { x, w: mw * 12, mw };
+  C.right = x + mw * 12;
+  return C;
+}
+
+function layoutGroup(ctx, C, p) {
+  const { PX } = PG;
+  ctx.font = pfont(400, PG.FS);
+  const kp = kpiList(p);
+  const acts = (p.activities.length ? p.activities : [{ text: '', months: [] }]).map((a, i) => ({
+    lines: a.text ? wrapText(ctx, `${i + 1}. ${a.text}`, C.act.w - PX * 2) : [],
+    months: MONTHS.map((m, j) => !!(a.months && a.months[j]))
+  }));
   return {
-    ok: true,
-    settings: settings,
-    strategies: strategies,
-    staff: staff,
-    projects: projects,
-    months: MONTHS,
-    sheetUrl: T.ss.getUrl(),
-    serverTime: nowStr_()
+    label: `${p.order}. (ต่อ)`,
+    goal: wrapText(ctx, `${p.order}. ${p.title}`, C.goal.w - PX * 2),
+    kpi: kp.flatMap((k, i) => wrapText(ctx, (kp.length > 1 ? `${i + 1}. ` : '') + k, C.kpi.w - PX * 2)),
+    budget: wrapText(ctx, p.budget || '', C.budget.w - PX * 2),
+    resp: respList(p).flatMap(r => wrapText(ctx, r, C.resp.w - PX * 2)),
+    acts
   };
 }
+const actH = a => Math.max(1, a.lines.length) * PG.LH + PG.PY * 2;
+const spanH = g => Math.max(1, g.goal.length, g.kpi.length, g.budget.length, g.resp.length) * PG.LH + PG.PY * 2;
+const groupH = g => Math.max(g.acts.reduce((s, a) => s + actH(a), 0), spanH(g));
 
-/* ===================== Write ===================== */
-
-function saveProject_(p) {
-  if (!p || !String(p.title || '').trim()) throw new Error('กรุณาระบุเป้าประสงค์/โครงการ');
-  const T = ensureSchema_();
-  const pm = T.projects.map;
-  const now = new Date();
-  const id = toStr_(p.id) || newId_('P');
-
-  const rows = readRaw_(T.projects);
-  const idx = rows.findIndex(function (r) { return toStr_(r[pm['รหัสแผนงาน']]) === id; });
-  const row = idx >= 0 ? rows[idx] : blankRow_(T.projects);
-  setCell_(T.projects, row, 'รหัสแผนงาน', id);
-  setCell_(T.projects, row, 'ยุทธศาสตร์ที่', toNum_(p.strategyNo) || 1);
-  setCell_(T.projects, row, 'ลำดับ', toNum_(p.order) || nextOrder_(rows, pm, toNum_(p.strategyNo) || 1));
-  setCell_(T.projects, row, 'เป้าประสงค์/โครงการ', String(p.title).trim());
-  setCell_(T.projects, row, 'ผลผลิต/ตัวชี้วัด', toStr_(p.indicators));
-  setCell_(T.projects, row, 'งบประมาณ', toStr_(p.budget));
-  setCell_(T.projects, row, 'ผู้รับผิดชอบ', toStr_(p.responsible));
-  if (idx < 0) setCell_(T.projects, row, 'วันที่บันทึก', now);
-  setCell_(T.projects, row, 'วันที่แก้ไข', now);
-
-  if (idx >= 0) T.projects.sh.getRange(idx + 2, 1, 1, row.length).setValues([row]);
-  else appendRows_(T.projects, [row]);
-
-  // แทนที่กิจกรรมทั้งหมดของแผนงานนี้
-  const am = T.activities.map;
-  const kept = readRows_(T.activities).filter(function (r) {
-    return toStr_(r[am['รหัสแผนงาน']]) !== id && r.some(function (v) { return v !== '' && v !== null; });
-  });
-  const acts = (p.activities || []).filter(function (a) { return String(a.text || '').trim(); });
-  const newRows = acts.map(function (a, i) {
-    const obj = { 'รหัสกิจกรรม': toStr_(a.id) || newId_('A'), 'รหัสแผนงาน': id, 'ลำดับ': i + 1, 'กิจกรรม': String(a.text).trim() };
-    MONTHS.forEach(function (m, mi) { obj[m] = (a.months && a.months[mi]) ? '✓' : ''; });
-    return rowFrom_(T.activities, obj);
-  });
-  writeRows_(T.activities, kept.concat(newRows));
-
-  const out = getAll_(T);
-  out.savedId = id;
-  return out;
+function splitGroup(g, avail) {
+  const maxLines = Math.floor((avail - PG.PY * 2) / PG.LH);
+  if (maxLines < 2) return null;
+  let used = 0, k = 0;
+  while (k < g.acts.length && used + actH(g.acts[k]) <= avail) { used += actH(g.acts[k]); k++; }
+  let headActs = g.acts.slice(0, k), restActs = g.acts.slice(k);
+  if (k === 0 && g.acts.length) {
+    const a = g.acts[0];
+    headActs = [{ lines: a.lines.slice(0, maxLines), months: a.months }];
+    restActs = [{ lines: a.lines.slice(maxLines), months: Array(12).fill(false) }, ...g.acts.slice(1)];
+  }
+  const cut = arr => [arr.slice(0, maxLines), arr.slice(maxLines)];
+  const [g1, g2] = cut(g.goal), [k1, k2] = cut(g.kpi), [b1, b2] = cut(g.budget), [r1, r2] = cut(g.resp);
+  const head = { label: g.label, goal: g1, kpi: k1, budget: b1, resp: r1, acts: headActs };
+  const rest = { label: g.label, goal: g2.length ? g2 : [g.label || '(ต่อ)'], kpi: k2, budget: b2, resp: r2, acts: restActs };
+  const restEmpty = !restActs.length && !g2.length && !k2.length && !b2.length && !r2.length;
+  return { head, rest: restEmpty ? null : rest };
 }
 
-function deleteProject_(id) {
-  id = toStr_(id);
-  if (!id) throw new Error('ไม่พบรหัสแผนงาน');
-  const T = ensureSchema_();
-  const pm = T.projects.map;
-  const rows = readRaw_(T.projects);
-  const idx = rows.findIndex(function (r) { return toStr_(r[pm['รหัสแผนงาน']]) === id; });
-  if (idx >= 0) T.projects.sh.deleteRow(idx + 2);
-  const am = T.activities.map;
-  const kept = readRows_(T.activities).filter(function (r) {
-    return toStr_(r[am['รหัสแผนงาน']]) !== id && r.some(function (v) { return v !== '' && v !== null; });
-  });
-  writeRows_(T.activities, kept);
-  return getAll_(T);
-}
-
-function saveSettings_(obj) {
-  const T = ensureSchema_();
-  EDITABLE_SETTINGS.forEach(function (k) {
-    if (obj && Object.prototype.hasOwnProperty.call(obj, k)) setSetting_(T, k, toStr_(obj[k]));
-  });
-  return getAll_(T);
-}
-
-function saveStrategies_(list) {
-  const T = ensureSchema_();
-  const clean = list
-    .map(function (s) { return { no: toNum_(s.no), name: toStr_(s.name).trim() }; })
-    .filter(function (s) { return s.name; });
-  if (!clean.length) throw new Error('ต้องมียุทธศาสตร์อย่างน้อย 1 รายการ');
-  writeRows_(T.strategies, clean.map(function (s, i) {
-    return rowFrom_(T.strategies, { 'ลำดับ': s.no || i + 1, 'ชื่อยุทธศาสตร์': s.name });
-  }));
-  return getAll_(T);
-}
-
-function saveStaff_(list) {
-  const T = ensureSchema_();
-  const clean = list
-    .map(function (s) { return { name: toStr_(s.name).trim(), position: toStr_(s.position).trim() }; })
-    .filter(function (s) { return s.name; });
-  writeRows_(T.staff, clean.map(function (s, i) {
-    return rowFrom_(T.staff, { 'ลำดับ': i + 1, 'ชื่อ': s.name, 'ตำแหน่ง': s.position });
-  }));
-  return getAll_(T);
-}
-
-/* ===================== Helpers ===================== */
-
-function withLock_(fn) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try { return fn(); } finally { lock.releaseLock(); }
-}
-
-function jsonOut_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
-}
-
-function readRaw_(t) {
-  const last = t.sh.getLastRow();
-  if (last < 2) return [];
-  return t.sh.getRange(2, 1, last - 1, t.header.length).getValues();
-}
-
-function readRows_(t) {
-  return readRaw_(t).filter(function (r) { return r.some(function (v) { return v !== '' && v !== null; }); });
-}
-
-function writeRows_(t, rows) {
-  const last = t.sh.getLastRow();
-  if (last >= 2) t.sh.getRange(2, 1, last - 1, t.header.length).clearContent();
-  if (rows.length) t.sh.getRange(2, 1, rows.length, t.header.length).setValues(rows);
-}
-
-function appendRows_(t, rows) {
-  if (!rows.length) return;
-  const start = Math.max(t.sh.getLastRow(), 1) + 1;
-  t.sh.getRange(start, 1, rows.length, t.header.length).setValues(rows);
-}
-
-function blankRow_(t) { return t.header.map(function () { return ''; }); }
-
-function rowFrom_(t, obj) {
-  const row = blankRow_(t);
-  Object.keys(obj).forEach(function (k) { if (k in t.map) row[t.map[k]] = obj[k]; });
-  return row;
-}
-
-function setCell_(t, row, key, val) { if (key in t.map) row[t.map[key]] = val; }
-
-function readSettings_(T) {
-  const m = T.settings.map;
-  const out = {};
-  readRows_(T.settings).forEach(function (r) {
-    const k = toStr_(r[m['คีย์']]).trim();
-    if (k) out[k] = toStr_(r[m['ค่า']]);
-  });
-  return out;
-}
-
-function setSetting_(T, key, value) {
-  const m = T.settings.map;
-  const last = T.settings.sh.getLastRow();
-  if (last >= 2) {
-    const keys = T.settings.sh.getRange(2, m['คีย์'] + 1, last - 1, 1).getValues();
-    for (let i = 0; i < keys.length; i++) {
-      if (String(keys[i][0]).trim() === key) {
-        T.settings.sh.getRange(i + 2, m['ค่า'] + 1).setValue(value);
-        return;
+function paginate(ctx, C) {
+  const st = settings();
+  const TITLE_H = 44, HEAD_H = 30, FOOT = 16;
+  const bottom = PG.H - PG.M - FOOT;
+  const bodyTop = first => PG.M + (first ? TITLE_H : 0) + HEAD_H;
+  const fullAvail = bottom - bodyTop(false);
+  const pages = [];
+  let cur;
+  const newPage = () => { cur = { first: !pages.length, items: [], y: bodyTop(!pages.length) }; pages.push(cur); };
+  newPage();
+  strategies().forEach(s => {
+    ctx.font = pfont(700, PG.FS + .4);
+    const sLines = wrapText(ctx, `ยุทธศาสตร์ที่ ${s.no}: ${s.name}`, C.right - PG.M - PG.PX * 2);
+    const sh = sLines.length * PG.LH + PG.PY * 2 + 1;
+    const groups = projectsOf(s.no).map(p => layoutGroup(ctx, C, p));
+    const nextNeed = groups.length ? Math.min(groupH(groups[0]), fullAvail) : 0;
+    if (cur.items.length && cur.y + sh + nextNeed > bottom) newPage();
+    cur.items.push({ type: 's', lines: sLines, y: cur.y, h: sh }); cur.y += sh;
+    groups.forEach(g0 => {
+      let g = g0, guard = 0;
+      while (g && guard++ < 50) {
+        const h = groupH(g);
+        if (cur.y + h <= bottom) { cur.items.push({ type: 'g', g, y: cur.y, h }); cur.y += h; g = null; continue; }
+        const room = bottom - cur.y;
+        if (h <= fullAvail && cur.items.length && cur.items[cur.items.length - 1].type !== 's') {
+          // เก็บแผนงานไว้หน้าเดียวกัน ยกเว้นพื้นที่ว่างเหลือมาก จึงแบ่งต่อหน้าถัดไปตามรายการกิจกรรม
+          let sp = room >= fullAvail * .3 ? splitGroup(g, room) : null;
+          if (sp && sp.rest && sp.rest.acts.length === 1 && sp.head.acts.length >= 3) {
+            sp = splitGroup(g, room - actH(sp.head.acts[sp.head.acts.length - 1]) - .5);
+          }
+          if (sp && sp.head.acts.length >= 2 && sp.rest && sp.rest.acts.length) {
+            const hh = groupH(sp.head);
+            cur.items.push({ type: 'g', g: sp.head, y: cur.y, h: hh }); cur.y += hh; g = sp.rest; newPage(); continue;
+          }
+          newPage(); continue;
+        }
+        if (h <= fullAvail && cur.items.length && cur.items[cur.items.length - 1].type === 's') {
+          // หัวยุทธศาสตร์อยู่ท้ายหน้า ย้ายไปหน้าใหม่พร้อมกัน
+          const sItem = cur.items.pop(); cur.y -= sItem.h;
+          if (!cur.items.length && pages.length > 1) { pages.pop(); cur = pages[pages.length - 1]; }
+          newPage(); sItem.y = cur.y; cur.items.push(sItem); cur.y += sItem.h; continue;
+        }
+        const sp = splitGroup(g, bottom - cur.y);
+        if (!sp) { newPage(); continue; }
+        const hh = groupH(sp.head);
+        cur.items.push({ type: 'g', g: sp.head, y: cur.y, h: hh }); cur.y += hh;
+        g = sp.rest; if (g) newPage();
       }
-    }
-  }
-  appendRows_(T.settings, [rowFrom_(T.settings, { 'คีย์': key, 'ค่า': value })]);
-}
-
-function nextOrder_(rows, pm, strategyNo) {
-  let max = 0;
-  rows.forEach(function (r) {
-    if (toNum_(r[pm['ยุทธศาสตร์ที่']]) === strategyNo) max = Math.max(max, toNum_(r[pm['ลำดับ']]));
-  });
-  return max + 1;
-}
-
-function newId_(prefix) { return prefix + Utilities.getUuid().replace(/-/g, '').slice(0, 10); }
-function toStr_(v) { return v === null || v === undefined ? '' : (v instanceof Date ? fmtDate_(v) : String(v)); }
-function toNum_(v) { const n = Number(v); return isFinite(n) ? n : 0; }
-function isOn_(v) {
-  if (v === true) return true;
-  const s = String(v === null || v === undefined ? '' : v).trim().toLowerCase();
-  return s !== '' && s !== '0' && s !== 'false' && s !== '-' && s !== 'no';
-}
-function fmtDate_(v) {
-  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd HH:mm');
-  return v ? String(v) : '';
-}
-function nowStr_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'); }
-
-/* ===================== ข้อมูลตั้งต้น (บริบทหน่วยไตเทียม) ===================== */
-
-const SEED_STRATEGIES = [
-  'ยกระดับคุณภาพบริการพยาบาลด้านโรคติดเชื้อและโรคอุบัติใหม่สู่ความเป็นเลิศ',
-  'พัฒนาระบบบริหารจัดการทางการพยาบาลให้มีประสิทธิภาพ',
-  'เสริมสร้างศักยภาพบุคลากรทางการพยาบาลให้มีความเชี่ยวชาญ',
-  'ส่งเสริมการสร้างองค์ความรู้ วิจัยและนวัตกรรมทางการพยาบาล',
-  'พัฒนาระบบเทคโนโลยีสารสนเทศเพื่อการพยาบาล'
-];
-
-const SEED_STAFF = [
-  ['อ้อมอารีย์', 'หัวหน้าหน่วยไตเทียม'],
-  ['สุกัญญา', 'พยาบาลวิชาชีพ หน่วยไตเทียม']
-];
-
-// เดือนในปีงบประมาณ: 0=ต.ค. 1=พ.ย. 2=ธ.ค. 3=ม.ค. 4=ก.พ. 5=มี.ค. 6=เม.ย. 7=พ.ค. 8=มิ.ย. 9=ก.ค. 10=ส.ค. 11=ก.ย.
-function R_(a, b) { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; }
-const ALL_YEAR = R_(0, 11);
-const Q3 = [2, 5, 8, 11];
-
-const SEED_PROJECTS = [
-  // ---------- ยุทธศาสตร์ที่ 1 ----------
-  {
-    s: 1, title: 'พัฒนาแนวทางเฝ้าระวังและป้องกันการติดเชื้อในผู้ป่วยวิกฤตที่ได้รับการฟอกเลือดด้วยเครื่องไตเทียม',
-    acts: [
-      ['ทบทวน ค้นหาปัญหา และวิเคราะห์ข้อมูลการติดเชื้อที่สัมพันธ์กับสายสวนหลอดเลือดดำสำหรับฟอกเลือด (DLC)', [0, 1]],
-      ['ศึกษางานวิจัยและหลักฐานเชิงประจักษ์ที่เกี่ยวข้อง', [1, 2]],
-      ['ปรับปรุงแนวปฏิบัติการดูแลสายสวนหลอดเลือดดำสำหรับฟอกเลือด (DLC care bundle) และแนวทางป้องกันการแพร่กระจายเชื้อไวรัสตับอักเสบบี ซี และเอชไอวีในหน่วยไตเทียม', [2, 3]],
-      ['นำแนวปฏิบัติไปทดลองใช้และปรับแก้ไข', [3, 4, 5]],
-      ['ประเมินติดตามผลการปฏิบัติทุก 3 เดือน', [5, 8, 11]],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'อัตราการติดเชื้อในกระแสเลือดสัมพันธ์กับสายสวนหลอดเลือดดำสำหรับฟอกเลือด (เป้าหมาย: < 1 ครั้ง/1,000 วันคาสายสวน)',
-      'อุบัติการณ์ผลเลือดเปลี่ยนเป็นบวกของไวรัสตับอักเสบบี ซี ในหน่วยไตเทียม (เป้าหมาย: 0)',
-      'ร้อยละของการปฏิบัติตามแนวทางการพยาบาล (เป้าหมาย: ≥ 90%)',
-      'ร้อยละความพึงพอใจของบุคลากรต่อการใช้แนวทางปฏิบัติ (เป้าหมาย: > 90%)'
-    ],
-    budget: 'ไม่มี', resp: 'อ้อมอารีย์, สุกัญญา'
-  },
-  {
-    s: 1, title: 'พัฒนาความพร้อมการฟอกเลือดข้างเตียงสำหรับผู้ป่วยโรคติดเชื้ออุบัติใหม่อุบัติซ้ำในห้องแยกโรคความดันลบ',
-    acts: [
-      ['ทบทวนแนวทางการฟอกเลือดผู้ป่วยโรคติดเชื้ออุบัติใหม่อุบัติซ้ำร่วมกับงานป้องกันและควบคุมการติดเชื้อ (IC)', [0, 1]],
-      ['ตรวจสอบความพร้อมใช้ของเครื่องไตเทียมและเครื่องกรองน้ำบริสุทธิ์ (RO) เคลื่อนที่สำหรับห้องแยกโรค', [1, 2]],
-      ['ฝึกทักษะการสวมและถอดอุปกรณ์ป้องกันส่วนบุคคล (PPE) และการเคลื่อนย้ายเครื่องไตเทียมเข้าห้องแยกโรค', [2, 3]],
-      ['ฝึกซ้อมแผนรับผู้ป่วยโรคติดเชื้ออุบัติใหม่อุบัติซ้ำที่ต้องได้รับการฟอกเลือดร่วมกับหอผู้ป่วยวิกฤต', [4, 5]],
-      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'ร้อยละความพร้อมใช้ของเครื่องไตเทียมและอุปกรณ์สำหรับห้องแยกโรค (เป้าหมาย: 100%)',
-      'บุคลากรในหน่วยงานผ่านการฝึกสวมและถอด PPE (เป้าหมาย: 100%)',
-      'อุบัติการณ์บุคลากรติดเชื้อจากการปฏิบัติงาน (เป้าหมาย: 0)'
-    ],
-    budget: 'งบหน่วยงาน', resp: 'อ้อมอารีย์, สุกัญญา'
-  },
-  {
-    s: 1, title: 'เฝ้าระวังคุณภาพน้ำบริสุทธิ์ (RO) และน้ำยาฟอกเลือดเพื่อความปลอดภัยของผู้ป่วย',
-    acts: [
-      ['ตรวจวัดคุณภาพน้ำ RO ประจำวัน (คลอรีน ความกระด้าง ค่าการนำไฟฟ้า) และบันทึกในระบบติดตาม', ALL_YEAR],
-      ['ส่งตรวจเพาะเชื้อและเอนโดท็อกซินของน้ำ RO และน้ำยาฟอกเลือดตามรอบที่กำหนด', ALL_YEAR],
-      ['เปลี่ยนไส้กรองและล้างฆ่าเชื้อระบบน้ำตามแผนบำรุงรักษา', Q3],
-      ['ทบทวนผลและแก้ไขทันทีเมื่อผลไม่ผ่านเกณฑ์ พร้อมวิเคราะห์ทุก 3 เดือน', Q3],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'ร้อยละผลเพาะเชื้อและเอนโดท็อกซินของน้ำ RO และน้ำยาฟอกเลือดผ่านเกณฑ์มาตรฐาน (เป้าหมาย: 100%)',
-      'อุบัติการณ์ผู้ป่วยเกิดภาวะไข้หนาวสั่นจากสารไพโรเจนระหว่างฟอกเลือด (เป้าหมาย: 0)'
-    ],
-    budget: 'งบหน่วยงาน', resp: 'อ้อมอารีย์, สุกัญญา'
-  },
-  // ---------- ยุทธศาสตร์ที่ 2 ----------
-  {
-    s: 2, title: 'พัฒนาระบบบริหารจัดการอัตรากำลังให้มีประสิทธิภาพและรองรับการฟอกเลือดฉุกเฉินนอกเวลาราชการ',
-    acts: [
-      ['ทบทวน ค้นหาปัญหาภาระงานและการรับผู้ป่วยฟอกเลือดฉุกเฉินนอกเวลาราชการ', [0]],
-      ['ศึกษางานวิจัยที่เกี่ยวข้อง', [0, 1]],
-      ['จัดระบบพยาบาลเวรเรียก (on-call) สำหรับฟอกเลือดฉุกเฉินนอกเวลาราชการ', [1, 2]],
-      ['บันทึกภาระงานรายวันผ่านระบบภาระงานไตเทียม และวิเคราะห์ Productivity รายเดือน', ALL_YEAR],
-      ['ประเมินติดตามผลทุก 3 เดือน', Q3],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'อัตราของหน่วยงานบริการมี Productivity อยู่ในเกณฑ์ที่กำหนด (85–95%)',
-      'ร้อยละผู้ป่วยวิกฤตได้รับการฟอกเลือดฉุกเฉินอย่างทันท่วงทีตามเวลาที่กำหนด (เป้าหมาย: ≥ 90%)'
-    ],
-    budget: 'ไม่มี', resp: 'อ้อมอารีย์'
-  },
-  {
-    s: 2, title: 'พัฒนาความรู้และทักษะบุคลากรในหน่วยงาน',
-    acts: [
-      ['จัดบุคลากรเข้าอบรมตามแผนของกลุ่มการพยาบาลและงานป้องกันและควบคุมการติดเชื้อ (IC)', ALL_YEAR],
-      ['จัดบุคลากรเข้าอบรมการช่วยฟื้นคืนชีพ (CPR)', [2, 3]],
-      ['จัดบุคลากรเข้าอบรมฟื้นฟูวิชาการการพยาบาลโรคไตและการบำบัดทดแทนไตในผู้ป่วยวิกฤต', R_(4, 9)],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'บุคลากรในหน่วยงานผ่านการอบรมด้านการป้องกันและควบคุมการติดเชื้อ คนละ 2 ครั้ง/ปี',
-      'บุคลากรในหน่วยงานเข้าอบรม CPR 100%',
-      'บุคลากรในหน่วยงานผ่านการอบรมฟื้นฟูวิชาการการพยาบาลโรคไต อย่างน้อย 1 ครั้ง/คน/ปี'
-    ],
-    budget: 'ตามแผนกลุ่มการพยาบาล', resp: 'อ้อมอารีย์'
-  },
-  {
-    s: 2, title: 'การจัดซื้อวัสดุ ครุภัณฑ์ และจัดการสิ่งแวดล้อมในหน่วยงาน',
-    acts: [
-      ['สำรวจวัสดุ ครุภัณฑ์ เครื่องไตเทียม เครื่องกรองน้ำ RO เคลื่อนที่ และสิ่งแวดล้อมในหน่วยงาน', [0, 1]],
-      ['ส่งแผนจัดซื้อวัสดุและครุภัณฑ์', [5]],
-      ['ติดตามการบำรุงรักษาเชิงป้องกัน (PM) และการสอบเทียบเครื่องไตเทียมตามกำหนด', ALL_YEAR],
-      ['ตรวจสอบวัสดุคงคลังและความพร้อมใช้ของอุปกรณ์ทุกเดือน', ALL_YEAR]
-    ],
-    kpi: [
-      'หน่วยงานมีเครื่องไตเทียมและอุปกรณ์พร้อมใช้ 100%',
-      'เครื่องไตเทียมได้รับการบำรุงรักษาและสอบเทียบตามกำหนด 100%',
-      'จัดซื้อได้ตามกำหนดเวลา'
-    ],
-    budget: 'งบประมาณประจำปี', resp: 'อ้อมอารีย์, สุกัญญา'
-  },
-  // ---------- ยุทธศาสตร์ที่ 3 ----------
-  {
-    s: 3, title: 'การพัฒนาการใช้กระบวนการพยาบาลในกลุ่มโรคเสี่ยงสูงที่ได้รับการฟอกเลือด ได้แก่ AKI, Sepsis, ESRD ที่มีภาวะแทรกซ้อนเฉียบพลัน และโรคติดเชื้ออุบัติใหม่อุบัติซ้ำ',
-    acts: [
-      ['หัวหน้าหน่วยนิเทศการใช้กระบวนการพยาบาล', R_(0, 3)],
-      ['จัดทำแนวปฏิบัติการพยาบาลทางคลินิก (CNPG) การพยาบาลผู้ป่วยวิกฤตที่ได้รับการฟอกเลือด 4 กลุ่มโรค', R_(1, 3)],
-      ['นำแนวปฏิบัติไปใช้และเฝ้าระวังภาวะแทรกซ้อนระหว่างฟอกเลือด เช่น ความดันโลหิตต่ำ ภาวะโพแทสเซียมในเลือดผิดปกติ', R_(3, 11)],
-      ['สุ่มตรวจบันทึกทางการพยาบาล (HD Flow Sheet/Nursing Note) ของกลุ่มโรคเสี่ยงสูงทั้ง 4 กลุ่ม ให้ครบถ้วนตามกระบวนการพยาบาล', R_(3, 11)],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'ร้อยละความสมบูรณ์ของการบันทึกทางการพยาบาล (เป้าหมาย: ≥ 85%)',
-      'มีการนำกระบวนการพยาบาลมาใช้ 100%',
-      'ร้อยละของการปฏิบัติตามแนวทางการพยาบาล (เป้าหมาย: ≥ 90%)'
-    ],
-    budget: 'ไม่มี', resp: 'อ้อมอารีย์, สุกัญญา'
-  },
-  // ---------- ยุทธศาสตร์ที่ 4 ----------
-  {
-    s: 4, title: 'ส่งเสริมให้บุคลากรเข้าร่วมงานวิชาการของสถาบันฯ',
-    acts: [
-      ['กระตุ้นให้บุคลากรในหน่วยงานส่งผลงาน เช่น CQI นวัตกรรม ข้อเสนอแนะ', ALL_YEAR],
-      ['ให้บุคลากรเข้าร่วมการอบรมนักวิจัยของกลุ่มการพยาบาล', R_(3, 5)],
-      ['หัวหน้านิเทศติดตามความก้าวหน้าการทำ CQI นวัตกรรม และงานวิจัย', Q3],
-      ['ใช้บริการคลินิกวิจัยทางการพยาบาลเพื่อเป็นพี่เลี้ยงให้คำปรึกษาแก่บุคลากรในหน่วยงาน', R_(3, 9)],
-      ['สรุปจำนวนผลงาน CQI นวัตกรรม และงานวิจัยที่แล้วเสร็จ', [11]]
-    ],
-    kpi: [
-      'จำนวนผลงานวิจัย/นวัตกรรม/CQI ทางการพยาบาลที่แล้วเสร็จ (เป้าหมาย: ≥ 3 เรื่องต่อปี)',
-      'จำนวนผลงานที่ได้รับการนำเสนอในเวทีวิชาการภายนอก (เป้าหมาย: ≥ 1 เรื่องต่อปี)'
-    ],
-    budget: 'ไม่มี', resp: 'อ้อมอารีย์'
-  },
-  {
-    s: 4, title: 'CQI เรื่อง การพัฒนาแบบบันทึกการเฝ้าระวังสัญญาณชีพระหว่างฟอกเลือดสำหรับผู้ป่วยวิกฤต',
-    acts: [
-      ['วิเคราะห์หาสาเหตุและปัญหา', [0, 1]],
-      ['ศึกษางานหรือนวัตกรรมที่เกี่ยวข้อง', [1, 2]],
-      ['ร่วมกันพัฒนาแบบบันทึก', [2, 3]],
-      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'ร้อยละการบันทึกสัญญาณชีพระหว่างฟอกเลือดครบถ้วนตามแบบบันทึก (เป้าหมาย: ≥ 90%)',
-      'ความพึงพอใจในการใช้ของเจ้าหน้าที่ > 90%'
-    ],
-    budget: 'งบหน่วยงาน', resp: 'สุกัญญา'
-  },
-  {
-    s: 4, title: 'CQI เรื่อง ชุดเตรียมพร้อมฟอกเลือดเคลื่อนที่ (Mobile HD Ready Box) สำหรับฟอกเลือดข้างเตียงในหอผู้ป่วยวิกฤตและห้องแยกโรค',
-    acts: [
-      ['วิเคราะห์หาสาเหตุและปัญหา', [0, 1]],
-      ['ศึกษางานหรือนวัตกรรมที่เกี่ยวข้อง', [1, 2]],
-      ['ร่วมกันสร้างนวัตกรรม', [2, 3]],
-      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'การเตรียมอุปกรณ์ฟอกเลือดข้างเตียงครบถ้วนถูกต้อง (เป้าหมาย: 100%)',
-      'ความพึงพอใจในการใช้ของเจ้าหน้าที่ > 90%'
-    ],
-    budget: 'งบหน่วยงาน', resp: 'อ้อมอารีย์, สุกัญญา'
-  },
-  // ---------- ยุทธศาสตร์ที่ 5 ----------
-  {
-    s: 5, title: 'พัฒนาการให้คำแนะนำผู้ป่วยและญาติเมื่อเข้ารับการฟอกเลือดด้วยเครื่องไตเทียม',
-    acts: [
-      ['ทบทวนปัญหา', [0]],
-      ['จัดทำสื่อความรู้ (แผ่นพับ/E-Book) เรื่องการปฏิบัติตัวก่อนและหลังฟอกเลือด และการดูแลสายสวนหลอดเลือดดำสำหรับฟอกเลือด', [1, 2]],
-      ['จัดทำ QR code เข้าถึงคลังความรู้สำหรับผู้ป่วยและญาติ', [2, 3]],
-      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'มี QR code สื่อความรู้สำหรับผู้ป่วยและญาติ',
-      'ร้อยละความพึงพอใจของผู้ป่วยและญาติต่อการให้คำแนะนำผ่าน QR code (เป้าหมาย: > 90%)'
-    ],
-    budget: 'ไม่มี', resp: 'สุกัญญา'
-  },
-  {
-    s: 5, title: 'พัฒนาระบบสารสนเทศติดตามภาระงาน ตัวชี้วัด และความเสี่ยงของหน่วยไตเทียม',
-    acts: [
-      ['ทบทวนความต้องการใช้ข้อมูลของหน่วยงาน', [0]],
-      ['พัฒนาและปรับปรุงระบบบันทึกภาระงาน Dashboard ตัวชี้วัด และทะเบียนความเสี่ยง', R_(1, 3)],
-      ['บันทึกข้อมูลและรายงานตัวชี้วัดรายเดือน', ALL_YEAR],
-      ['ประเมินผลการใช้งานทุก 3 เดือน', [5, 8, 11]],
-      ['สรุปผลการดำเนินงาน', [11]]
-    ],
-    kpi: [
-      'รายงานตัวชี้วัดของหน่วยงานครบถ้วนและทันเวลา (เป้าหมาย: 100%)',
-      'ร้อยละความพึงพอใจของผู้ใช้งานระบบ (เป้าหมาย: > 90%)'
-    ],
-    budget: 'ไม่มี', resp: 'อ้อมอารีย์'
-  }
-];
-
-function seedProjects_(T) {
-  const now = new Date();
-  const order = {};
-  const pRows = [];
-  const aRows = [];
-  SEED_PROJECTS.forEach(function (p) {
-    order[p.s] = (order[p.s] || 0) + 1;
-    const id = newId_('P');
-    pRows.push(rowFrom_(T.projects, {
-      'รหัสแผนงาน': id, 'ยุทธศาสตร์ที่': p.s, 'ลำดับ': order[p.s],
-      'เป้าประสงค์/โครงการ': p.title, 'ผลผลิต/ตัวชี้วัด': p.kpi.join('\n'),
-      'งบประมาณ': p.budget, 'ผู้รับผิดชอบ': p.resp, 'วันที่บันทึก': now, 'วันที่แก้ไข': now
-    }));
-    p.acts.forEach(function (a, i) {
-      const obj = { 'รหัสกิจกรรม': newId_('A'), 'รหัสแผนงาน': id, 'ลำดับ': i + 1, 'กิจกรรม': a[0] };
-      MONTHS.forEach(function (m, mi) { obj[m] = a[1].indexOf(mi) >= 0 ? '✓' : ''; });
-      aRows.push(rowFrom_(T.activities, obj));
     });
   });
-  appendRows_(T.projects, pRows);
-  appendRows_(T.activities, aRows);
+  return { pages: pages.filter(p => p.items.length || p.first), TITLE_H, HEAD_H, bottom };
 }
+
+function drawPage(page, idx, total, C, L) {
+  const st = settings();
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(PG.W * PG.S); cv.height = Math.round(PG.H * PG.S);
+  const ctx = cv.getContext('2d');
+  ctx.scale(PG.S, PG.S);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PG.W, PG.H);
+  ctx.textBaseline = 'middle';
+  const INK = '#101a3d', GRID = '#59627f', NAVY = '#0d1d47';
+  const text = (s, x, y, w, align = 'left') => {
+    ctx.textAlign = align;
+    ctx.fillText(s, align === 'center' ? x + w / 2 : (align === 'right' ? x + w : x), y);
+  };
+  let y = PG.M;
+  if (page.first) {
+    ctx.fillStyle = INK;
+    ctx.font = pfont(700, 14); text(`แผนปฏิบัติงานประจำ${st.unitName || ''}`, 0, y + 10, PG.W, 'center');
+    ctx.font = pfont(700, 12); text(`ปีงบประมาณ ${st.fiscalYear || ''}   ${st.orgLine || ''}`, 0, y + 28, PG.W, 'center');
+    y += L.TITLE_H;
+  }
+  // table header
+  const H1 = 16, H2 = L.HEAD_H - H1, x0 = PG.M, x1 = C.right;
+  ctx.fillStyle = '#e7ecf6'; ctx.fillRect(x0, y, x1 - x0, L.HEAD_H);
+  ctx.fillStyle = NAVY; ctx.font = pfont(700, PG.FS);
+  [['goal', 'เป้าประสงค์/ยุทธศาสตร์'], ['act', 'กิจกรรม'], ['kpi', 'ผลผลิต/ตัวชี้วัด'], ['budget', 'งบประมาณ'], ['resp', 'ผู้รับผิดชอบ']]
+    .forEach(([k, t]) => text(t, C[k].x, y + L.HEAD_H / 2, C[k].w, 'center'));
+  text('ระยะเวลาดำเนินงาน', C.months.x, y + H1 / 2, C.months.w, 'center');
+  ctx.font = pfont(600, 7.6);
+  MONTHS.forEach((m, i) => text(m, C.months.x + i * C.months.mw, y + H1 + H2 / 2, C.months.mw, 'center'));
+  ctx.strokeStyle = GRID; ctx.lineWidth = .6;
+  ctx.strokeRect(x0, y, x1 - x0, L.HEAD_H);
+  ['act', 'kpi', 'budget', 'resp', 'months'].forEach(k => line(ctx, C[k].x, y, C[k].x, y + L.HEAD_H));
+  line(ctx, C.months.x, y + H1, x1, y + H1);
+  for (let i = 1; i < 12; i++) line(ctx, C.months.x + i * C.months.mw, y + H1, C.months.x + i * C.months.mw, y + L.HEAD_H);
+
+  page.items.forEach(it => {
+    if (it.type === 's') {
+      ctx.fillStyle = '#f6ecd0'; ctx.fillRect(x0, it.y, x1 - x0, it.h);
+      ctx.fillStyle = NAVY; ctx.font = pfont(700, PG.FS + .4);
+      it.lines.forEach((l, i) => text(l, x0 + PG.PX, it.y + PG.PY + PG.LH * (i + .5) + .5, 0));
+      ctx.strokeStyle = GRID; ctx.lineWidth = .6; ctx.strokeRect(x0, it.y, x1 - x0, it.h);
+      return;
+    }
+    drawGroup(ctx, C, it.g, it.y, it.h, INK, GRID, NAVY);
+  });
+  // footer
+  ctx.fillStyle = '#6b7394'; ctx.font = pfont(400, 7.4);
+  text(`แผนปฏิบัติงานประจำ${st.unitName || ''} ปีงบประมาณ ${st.fiscalYear || ''} · จัดทำเมื่อ ${thaiDate()}`, x0, PG.H - PG.M + 6, 0);
+  text(`หน้า ${idx + 1} / ${total}`, x0, PG.H - PG.M + 6, x1 - x0, 'right');
+  return cv;
+}
+function line(ctx, ax, ay, bx, by) { ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); }
+function drawGroup(ctx, C, g, y, h, INK, GRID, NAVY) {
+  const { PX, PY, LH } = PG;
+  const x0 = PG.M, x1 = C.right;
+  // activity rows
+  let ry = y;
+  const rows = g.acts.map((a, i) => { let rh = actH(a); if (i === g.acts.length - 1) rh = y + h - ry; const r = { a, y: ry, h: rh }; ry += rh; return r; });
+  rows.forEach(r => {
+    runs(r.a.months).forEach(([s, e]) => {
+      ctx.fillStyle = 'rgba(212,167,60,.24)';
+      ctx.fillRect(C.months.x + s * C.months.mw, r.y, (e - s + 1) * C.months.mw, r.h);
+    });
+  });
+  ctx.fillStyle = INK; ctx.font = pfont(400, PG.FS);
+  const col = (k, lines) => lines.forEach((l, i) => { ctx.textAlign = 'left'; ctx.fillText(l, C[k].x + PX, y + PY + LH * (i + .5) + .5); });
+  col('goal', g.goal); col('kpi', g.kpi); col('budget', g.budget); col('resp', g.resp);
+  rows.forEach(r => r.a.lines.forEach((l, i) => { ctx.textAlign = 'left'; ctx.fillText(l, C.act.x + PX, r.y + PY + LH * (i + .5) + .5); }));
+  // gantt arrows
+  ctx.strokeStyle = NAVY; ctx.fillStyle = NAVY; ctx.lineWidth = 1;
+  rows.forEach(r => {
+    const cy = r.y + PY + LH * .5 + .5;
+    runs(r.a.months).forEach(([s, e]) => {
+      const a = C.months.x + s * C.months.mw + 1.6, b = C.months.x + (e + 1) * C.months.mw - 1.6, ah = 2.8, aw = 1.9;
+      line(ctx, a + ah - .4, cy, b - ah + .4, cy);
+      ctx.beginPath(); ctx.moveTo(a, cy); ctx.lineTo(a + ah, cy - aw); ctx.lineTo(a + ah, cy + aw); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(b, cy); ctx.lineTo(b - ah, cy - aw); ctx.lineTo(b - ah, cy + aw); ctx.closePath(); ctx.fill();
+    });
+  });
+  // grid
+  ctx.strokeStyle = GRID; ctx.lineWidth = .6;
+  ctx.strokeRect(x0, y, x1 - x0, h);
+  ['act', 'kpi', 'budget', 'resp', 'months'].forEach(k => line(ctx, C[k].x, y, C[k].x, y + h));
+  for (let i = 1; i < 12; i++) line(ctx, C.months.x + i * C.months.mw, y, C.months.x + i * C.months.mw, y + h);
+  ctx.lineWidth = .4; ctx.strokeStyle = '#8a92ab';
+  rows.slice(0, -1).forEach(r => { line(ctx, C.act.x, r.y + r.h, C.act.x + C.act.w, r.y + r.h); line(ctx, C.months.x, r.y + r.h, x1, r.y + r.h); });
+}
+
+function canvasToJpeg(cv) {
+  return new Promise((res, rej) => cv.toBlob(b => b ? b.arrayBuffer().then(buf => res(new Uint8Array(buf))) : rej(new Error('แปลงภาพไม่สำเร็จ')), 'image/jpeg', .92));
+}
+function utf16hex(s) { let h = 'FEFF'; for (const ch of s) { const c = ch.codePointAt(0); if (c > 0xffff) { const v = c - 0x10000; h += (0xd800 + (v >> 10)).toString(16).padStart(4, '0') + (0xdc00 + (v & 0x3ff)).toString(16).padStart(4, '0'); } else h += c.toString(16).padStart(4, '0'); } return h.toUpperCase(); }
+function buildPdf(imgs, title) {
+  const enc = new TextEncoder(), chunks = [], offs = [];
+  let pos = 0;
+  const put = d => { const b = typeof d === 'string' ? enc.encode(d) : d; chunks.push(b); pos += b.length; };
+  const n = imgs.length, W = PG.W.toFixed(2), H = PG.H.toFixed(2);
+  const total = 3 + n * 3;
+  const obj = (num, body) => { offs[num] = pos; put(`${num} 0 obj\n${body}\nendobj\n`); };
+  put('%PDF-1.4\n'); put(new Uint8Array([37, 226, 227, 207, 211, 10]));
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2, `<< /Type /Pages /Kids [${imgs.map((_, i) => `${4 + i * 3} 0 R`).join(' ')}] /Count ${n} >>`);
+  obj(3, `<< /Title <${utf16hex(title)}> /Producer (Action Plan HD Unit) /CreationDate (D:${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}) >>`);
+  imgs.forEach((im, i) => {
+    const pn = 4 + i * 3, cn = pn + 1, inum = pn + 2;
+    obj(pn, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im${i} ${inum} 0 R >> /ProcSet [/PDF /ImageC] >> /Contents ${cn} 0 R >>`);
+    const content = `q ${W} 0 0 ${H} 0 0 cm /Im${i} Do Q`;
+    obj(cn, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    offs[inum] = pos;
+    put(`${inum} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`);
+    put(im.bytes); put('\nendstream\nendobj\n');
+  });
+  const xref = pos;
+  let x = `xref\n0 ${total + 1}\n0000000000 65535 f \n`;
+  for (let k = 1; k <= total; k++) x += String(offs[k]).padStart(10, '0') + ' 00000 n \n';
+  put(x + `trailer\n<< /Size ${total + 1} /Root 1 0 R /Info 3 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(chunks, { type: 'application/pdf' });
+}
+
+let pdfBusy = false;
+async function makePdf() {
+  if (!S.data) { toast('ยังไม่มีข้อมูลแผนงาน', 'bad'); return; }
+  if (pdfBusy) return; pdfBusy = true;
+  const st = settings();
+  const w = openModal(`<div class="m-head"><div class="deco">EXPORT PDF</div><h3>สร้างไฟล์ PDF แผนปฏิบัติงาน</h3></div>${divider(true)}
+    <div class="m-body" id="pdfBody"><div class="empty"><span class="spinner" style="display:inline-block;width:22px;height:22px;border-radius:50%;border:2px solid #c39232;border-right-color:transparent;animation:spin .8s linear infinite"></span><div>กำลังจัดหน้าเอกสาร…</div></div></div>
+    <div class="m-foot"><button class="btn btn-line" data-act="ed-cancel-pdf">ปิด</button><button class="btn btn-navy" id="pdfDl" disabled>${icon('download')}ดาวน์โหลด PDF</button></div>`);
+  w.id = 'pdfModal';
+  w.querySelector('[data-act="ed-cancel-pdf"]').onclick = () => closeModal(w);
+  try {
+    try { await Promise.all([document.fonts.load(pfont(400, 12)), document.fonts.load(pfont(700, 12)), document.fonts.load(pfont(600, 12))]); await document.fonts.ready; } catch (e) {}
+    await new Promise(r => setTimeout(r, 30));
+    const C = pdfColumns();
+    const mctx = document.createElement('canvas').getContext('2d');
+    const L = paginate(mctx, C);
+    const imgs = [], urls = [];
+    for (let i = 0; i < L.pages.length; i++) {
+      const cv = drawPage(L.pages[i], i, L.pages.length, C, L);
+      const bytes = await canvasToJpeg(cv);
+      imgs.push({ bytes, w: cv.width, h: cv.height });
+      urls.push(URL.createObjectURL(new Blob([bytes], { type: 'image/jpeg' })));
+    }
+    const title = `แผนปฏิบัติงานประจำ${st.unitName || ''} ปีงบประมาณ ${st.fiscalYear || ''}`;
+    const blob = buildPdf(imgs, title);
+    const fname = `ActionPlan_${(st.unitName || 'unit').replace(/\s+/g, '')}_${st.fiscalYear || ''}.pdf`;
+    const url = URL.createObjectURL(blob);
+    S.lastPdf = { blob, url, fname, pages: imgs.length };
+    $('#pdfBody').innerHTML = `<p style="text-align:center;margin:0 0 12px;color:#3a4572">${imgs.length} หน้า · A4 แนวนอน · ${(blob.size / 1024 / 1024).toFixed(2)} MB</p>
+      <div class="pdf-pages">${urls.map((u, i) => `<img src="${u}" alt="หน้า ${i + 1}"><div class="pg">หน้า ${i + 1}</div>`).join('')}</div>`;
+    const dl = $('#pdfDl'); dl.disabled = false;
+    dl.onclick = () => { const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove(); toast('ดาวน์โหลด ' + fname + ' แล้ว'); };
+  } catch (err) {
+    $('#pdfBody').innerHTML = `<div class="empty" style="color:#b23a3a">สร้าง PDF ไม่สำเร็จ: ${esc(err.message || err)}</div>`;
+  } finally { pdfBusy = false; }
+}
+
+/* =========================================================
+   โมเดลไต 3 มิติ สีแดง หมุน 360° (WebGL เขียนเอง ไม่ใช้ไลบรารี)
+   ลากเพื่อหมุนดูรอบด้านได้ ปล่อยแล้วหมุนต่อเอง
+   ========================================================= */
+const Kidney3D = (() => {
+  let cv = null, gl = null, prog = null, meshes = [], loc = {}, raf = 0, visible = true, ok = false;
+  let ang = 0, vel = 0, drag = null, last = 0, autoSpin = .62;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- small matrix helpers (column-major) ---------- */
+  const M = {
+    ident: () => [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+    mul(a, b) { const o = new Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; },
+    persp(f, asp, n, fa) { const t = 1 / Math.tan(f / 2); return [t / asp,0,0,0, 0,t,0,0, 0,0,(fa + n) / (n - fa),-1, 0,0,2 * fa * n / (n - fa),0]; },
+    trans: (x, y, z) => [1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1],
+    rotY: a => { const c = Math.cos(a), s = Math.sin(a); return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]; },
+    rotX: a => { const c = Math.cos(a), s = Math.sin(a); return [1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]; },
+    rotZ: a => { const c = Math.cos(a), s = Math.sin(a); return [c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]; }
+  };
+
+  /* ---------- geometry ---------- */
+  function finish(pos, idx) {
+    const nor = new Float32Array(pos.length);
+    for (let i = 0; i < idx.length; i += 3) {
+      const a = idx[i] * 3, b = idx[i + 1] * 3, c = idx[i + 2] * 3;
+      const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      for (const k of [a, b, c]) { nor[k] += nx; nor[k + 1] += ny; nor[k + 2] += nz; }
+    }
+    for (let i = 0; i < nor.length; i += 3) { const l = Math.hypot(nor[i], nor[i + 1], nor[i + 2]) || 1; nor[i] /= l; nor[i + 1] /= l; nor[i + 2] /= l; }
+    return { pos: new Float32Array(pos), nor, idx: new Uint16Array(idx) };
+  }
+  // ตัวไต: ทรงรีบิดเป็นรูปถั่ว มีรอยเว้าขั้วไตด้านใน
+  function kidneyMesh() {
+    const SU = 110, SV = 80, pos = [], idx = [];
+    for (let v = 0; v <= SV; v++) {
+      const ph = v / SV * Math.PI, y0 = Math.cos(ph), s = Math.sin(ph);
+      for (let u = 0; u <= SU; u++) {
+        const th = u / SU * Math.PI * 2, x0 = s * Math.cos(th), z0 = s * Math.sin(th);
+        const lob = 1 + .018 * Math.sin(6 * th + 2 * ph) * s + .012 * Math.sin(11 * ph - 3 * th) * s;
+        let x = x0 * .6 * lob, y = y0 * 1.02, z = z0 * .42 * lob;
+        x += .17 * (1 - y0 * y0);                                        // ขอบนอกโค้งนูน ขอบในเว้า
+        const med = Math.max(0, -x0);
+        x += .36 * Math.exp(-(y0 * y0) / .055) * Math.pow(med, 2.2) * Math.exp(-(z0 * z0) / .35); // ขั้วไต
+        z *= 1 - .12 * Math.exp(-(y0 * y0) / .05) * med;
+        pos.push(x, y, z);
+      }
+    }
+    for (let v = 0; v < SV; v++) for (let u = 0; u < SU; u++) {
+      const a = v * (SU + 1) + u, b = a + SU + 1;
+      idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+    return finish(pos, idx);
+  }
+  // ท่อ (หลอดเลือด/ท่อไต) ตามเส้นโค้ง
+  function tubeMesh(pts, r0, r1, seg = 22, steps = 60) {
+    const cr = (p0, p1, p2, p3, t) => {
+      const t2 = t * t, t3 = t2 * t;
+      return [0, 1, 2].map(i => .5 * (2 * p1[i] + (-p0[i] + p2[i]) * t + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * t2 + (-p0[i] + 3 * p1[i] - 3 * p2[i] + p3[i]) * t3));
+    };
+    const P = [pts[0], ...pts, pts[pts.length - 1]], C = [];
+    for (let i = 0; i <= steps; i++) {
+      const f = i / steps * (pts.length - 1), k = Math.min(Math.floor(f), pts.length - 2), t = f - k;
+      C.push(cr(P[k], P[k + 1], P[k + 2], P[k + 3], t));
+    }
+    const pos = [], idx = [];
+    let nPrev = null;
+    C.forEach((c, i) => {
+      const nx = C[Math.min(i + 1, C.length - 1)], pv = C[Math.max(i - 1, 0)];
+      let T = [nx[0] - pv[0], nx[1] - pv[1], nx[2] - pv[2]]; const tl = Math.hypot(...T) || 1; T = T.map(v => v / tl);
+      let N = nPrev || (Math.abs(T[1]) < .9 ? [0, 1, 0] : [1, 0, 0]);
+      const d = N[0] * T[0] + N[1] * T[1] + N[2] * T[2];
+      N = [N[0] - d * T[0], N[1] - d * T[1], N[2] - d * T[2]]; const nl = Math.hypot(...N) || 1; N = N.map(v => v / nl); nPrev = N;
+      const B = [T[1] * N[2] - T[2] * N[1], T[2] * N[0] - T[0] * N[2], T[0] * N[1] - T[1] * N[0]];
+      const r = r0 + (r1 - r0) * Math.pow(i / steps, .6);
+      for (let j = 0; j <= seg; j++) {
+        const a = j / seg * Math.PI * 2, ca = Math.cos(a) * r, sa = Math.sin(a) * r;
+        pos.push(c[0] + N[0] * ca + B[0] * sa, c[1] + N[1] * ca + B[1] * sa, c[2] + N[2] * ca + B[2] * sa);
+      }
+    });
+    for (let i = 0; i < C.length - 1; i++) for (let j = 0; j < seg; j++) {
+      const a = i * (seg + 1) + j, b = a + seg + 1;
+      idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+    // ปิดปลายท่อ
+    const capAt = (ci, flip) => {
+      const c = C[ci], center = pos.length / 3; pos.push(...c);
+      for (let j = 0; j < seg; j++) { const a = ci * (seg + 1) + j; flip ? idx.push(center, a + 1, a) : idx.push(center, a, a + 1); }
+    };
+    capAt(C.length - 1, false);
+    return finish(pos, idx);
+  }
+
+  /* ---------- GL setup ---------- */
+  const VS = `attribute vec3 aP;attribute vec3 aN;uniform mat4 uMVP;uniform mat4 uM;varying vec3 vN;varying vec3 vW;
+void main(){vec4 w=uM*vec4(aP,1.);vW=w.xyz;vN=(uM*vec4(aN,0.)).xyz;gl_Position=uMVP*vec4(aP,1.);}`;
+  const FS = `precision mediump float;uniform vec3 uC;uniform vec3 uCam;uniform float uG;varying vec3 vN;varying vec3 vW;
+void main(){vec3 N=normalize(vN);if(!gl_FrontFacing)N=-N;vec3 V=normalize(uCam-vW);
+vec3 L1=normalize(vec3(.55,.75,.95));vec3 L2=normalize(vec3(-.9,.15,-.5));vec3 L3=normalize(vec3(0.,-1.,.3));
+float w1=max((dot(N,L1)+.35)/1.35,0.);float d2=max(dot(N,L2),0.);float d3=max(dot(N,L3),0.);
+vec3 H=normalize(L1+V);float sp=pow(max(dot(N,H),0.),56.)*uG;float sp2=pow(max(dot(N,normalize(L2+V)),0.),24.)*uG*.35;
+float fr=pow(1.-max(dot(N,V),0.),2.4);
+vec3 col=uC*(.16+.9*w1)+uC*.25*fr+vec3(1.,.96,.92)*sp*.95+vec3(.5,.7,1.)*sp2+vec3(1.,.8,.42)*fr*.5+vec3(.32,.5,1.)*d2*.22+vec3(.9,.6,.35)*d3*.08;
+gl_FragColor=vec4(col,1.);}`;
+  function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  function upload(m, color, gloss) {
+    const pb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, pb); gl.bufferData(gl.ARRAY_BUFFER, m.pos, gl.STATIC_DRAW);
+    const nb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, nb); gl.bufferData(gl.ARRAY_BUFFER, m.nor, gl.STATIC_DRAW);
+    const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
+    meshes.push({ pb, nb, ib, n: m.idx.length, color, gloss });
+  }
+  function init() {
+    cv = document.createElement('canvas');
+    cv.className = 'kidney-cv';
+    cv.setAttribute('role', 'img');
+    cv.setAttribute('aria-label', 'โมเดลไต 3 มิติ หมุนรอบตัว');
+    try { gl = cv.getContext('webgl', { antialias: true, alpha: true, premultipliedAlpha: true }) || cv.getContext('experimental-webgl'); } catch (e) { gl = null; }
+    if (!gl) return false;
+    try {
+      prog = gl.createProgram();
+      gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+      gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    } catch (e) { console.warn('[Kidney3D]', e); return false; }
+    gl.useProgram(prog);
+    ['aP', 'aN'].forEach(n => loc[n] = gl.getAttribLocation(prog, n));
+    ['uMVP', 'uM', 'uC', 'uCam', 'uG'].forEach(n => loc[n] = gl.getUniformLocation(prog, n));
+    gl.enable(gl.DEPTH_TEST);
+    upload(kidneyMesh(), [.70, .06, .12], 1);
+    // หลอดเลือดแดง ดำ และท่อไต ออกจากขั้วไต
+    upload(tubeMesh([[-.05, .1, .02], [-.42, .16, .04], [-.8, .2, -.02], [-1.12, .24, -.08]], .075, .052), [.86, .1, .16], .9);
+    upload(tubeMesh([[-.05, -.02, .1], [-.42, -.01, .16], [-.8, -.02, .14], [-1.12, .0, .12]], .09, .066), [.2, .3, .78], .9);
+    upload(tubeMesh([[-.06, -.12, -.04], [-.34, -.3, -.04], [-.36, -.72, -.02], [-.26, -1.22, 0], [-.2, -1.5, .02]], .11, .042), [.93, .84, .55], .7);
+    cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, a: ang, t: performance.now() }; vel = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) {} cv.classList.add('grab'); });
+    cv.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const na = drag.a + (e.clientX - drag.x) * .012, now = performance.now();
+      vel = (na - ang) / Math.max(.016, (now - drag.t) / 1000); drag.t = now; ang = na;
+    });
+    const end = () => { if (!drag) return; drag = null; cv.classList.remove('grab'); vel = Math.max(-6, Math.min(6, vel)); };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    if ('IntersectionObserver' in window) new IntersectionObserver(es => { visible = es[0].isIntersecting; if (visible) kick(); }, { threshold: 0 }).observe(cv);
+    document.addEventListener('visibilitychange', kick);
+    return true;
+  }
+  function resize() {
+    const r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    return [w, h];
+  }
+  function draw(now) {
+    raf = 0;
+    if (!cv.isConnected || !visible || document.hidden) return;
+    const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
+    if (!drag) {
+      vel += (autoSpin - vel) * Math.min(1, dt * 1.6);
+      ang += (reduce ? 0 : vel) * dt;
+    }
+    const [w, h] = resize();
+    gl.viewport(0, 0, w, h); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const t = now / 1000, cam = [0, 0, 5.2];
+    const P = M.persp(30 * Math.PI / 180, w / h, .1, 50);
+    const Vw = M.trans(0, 0, -cam[2]);
+    let Mo = M.mul(M.trans(0, .02 + Math.sin(t * 1.3) * .04, 0), M.mul(M.rotX(.16), M.mul(M.rotY(ang), M.mul(M.rotZ(-.18), M.trans(.3, .14, 0)))));
+    const MVP = M.mul(P, M.mul(Vw, Mo));
+    gl.uniformMatrix4fv(loc.uMVP, false, new Float32Array(MVP));
+    gl.uniformMatrix4fv(loc.uM, false, new Float32Array(Mo));
+    gl.uniform3fv(loc.uCam, cam);
+    meshes.forEach(m => {
+      gl.bindBuffer(gl.ARRAY_BUFFER, m.pb); gl.enableVertexAttribArray(loc.aP); gl.vertexAttribPointer(loc.aP, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, m.nb); gl.enableVertexAttribArray(loc.aN); gl.vertexAttribPointer(loc.aN, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ib);
+      gl.uniform3fv(loc.uC, m.color); gl.uniform1f(loc.uG, m.gloss);
+      gl.drawElements(gl.TRIANGLES, m.n, gl.UNSIGNED_SHORT, 0);
+    });
+    if ((!reduce || drag) && visible && !document.hidden) raf = requestAnimationFrame(draw);
+  }
+  function kick() { if (!raf && ok && cv && cv.isConnected && visible && !document.hidden) { last = 0; raf = requestAnimationFrame(draw); } }
+  return {
+    // วางโมเดลลงในกล่องของหน้าแรก (ใช้ canvas เดิมซ้ำ ไม่สร้าง WebGL ใหม่ทุกครั้งที่เปลี่ยนหน้า)
+    mount(host) {
+      if (!host) return;
+      if (!cv) ok = init();
+      if (!ok) { host.innerHTML = '<svg class="emblem k-fallback" viewBox="0 0 100 100"><use href="#emblem"/></svg>'; return; }
+      host.prepend(cv); kick();
+    }
+  };
+})();
+
+/* ---------------- หิมะบาง ๆ ด้านหลัง ---------------- */
+const Snow = (() => {
+  const cv = document.getElementById('snow');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!cv || !cv.getContext) return { start() {} };
+  const ctx = cv.getContext('2d');
+  let W = 0, H = 0, D = 1, flakes = [], last = 0, acc = 0;
+  const spr = (() => {
+    const o = document.createElement('canvas'); o.width = o.height = 24;
+    const g = o.getContext('2d'), gr = g.createRadialGradient(12, 12, 0, 12, 12, 12);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.35, 'rgba(235,244,255,.55)'); gr.addColorStop(1, 'rgba(220,235,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 24, 24); return o;
+  })();
+  const mk = (top) => ({
+    x: Math.random() * W, y: top ? -10 - Math.random() * 40 : Math.random() * H,
+    r: .9 + Math.pow(Math.random(), 2.2) * 2.6, vy: 14 + Math.random() * 26, sw: .4 + Math.random() * 1.1,
+    ph: Math.random() * 6.28, a: .22 + Math.random() * .38
+  });
+  function resize() {
+    D = Math.min(window.devicePixelRatio || 1, 1.5); W = innerWidth; H = innerHeight;
+    cv.width = Math.round(W * D); cv.height = Math.round(H * D);
+    const want = Math.round(Math.min(130, Math.max(40, W * H / 13000)));
+    while (flakes.length < want) flakes.push(mk(false));
+    flakes.length = want;
+  }
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (document.hidden) { last = now; return; }
+    const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
+    acc += dt; if (acc < 1 / 40) return; const step = acc; acc = 0;   // ~40 ภาพ/วินาที พอสำหรับหิมะ
+    ctx.setTransform(D, 0, 0, D, 0, 0); ctx.clearRect(0, 0, W, H);
+    const t = now / 1000;
+    for (const f of flakes) {
+      f.y += f.vy * step; f.x += Math.sin(t * f.sw + f.ph) * 12 * step;
+      if (f.y > H + 10) Object.assign(f, mk(true));
+      if (f.x < -10) f.x = W + 10; else if (f.x > W + 10) f.x = -10;
+      const s = f.r * 4;
+      ctx.globalAlpha = f.a; ctx.drawImage(spr, f.x - s / 2, f.y - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+  return {
+    start() {
+      resize(); addEventListener('resize', resize);
+      if (reduce) { ctx.setTransform(D, 0, 0, D, 0, 0); flakes.forEach(f => { ctx.globalAlpha = f.a * .6; ctx.drawImage(spr, f.x, f.y, f.r * 4, f.r * 4); }); return; }
+      requestAnimationFrame(frame);
+    }
+  };
+})();
+
+/* ---------------- boot ---------------- */
+(function boot() {
+  $('.brand').insertAdjacentHTML('afterbegin', corners());
+  hydrateIcons();
+  $('#menuBtn').innerHTML = icon('menu');
+  $('#syncBtn').innerHTML = icon('sync');
+  $('#fab').innerHTML = icon('plus');
+  tick(); setInterval(tick, 1000);
+  Snow.start();
+  if (route().id === 'plans') S.filter.s = route().arg || 0;
+  const c = lsGet(LS_CACHE);
+  if (c) { try { applyData(JSON.parse(c), true); render(); $('#loader').classList.add('hide'); } catch (e) {} }
+  load(true).finally(() => { $('#loader').classList.add('hide'); });
+})();
+</script>
+</body>
+</html>
