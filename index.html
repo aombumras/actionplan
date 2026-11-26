@@ -1,0 +1,665 @@
+/**
+ * ============================================================
+ *  Action Plan หน่วยไตเทียม — Google Apps Script (Backend)
+ *  กลุ่มการพยาบาล สถาบันบำราศนราดูร
+ * ------------------------------------------------------------
+ *  - สร้างชีตและคอลัมน์ที่ยังไม่มีให้อัตโนมัติทุกครั้งที่เรียกใช้
+ *  - ใส่ข้อมูลแผนปฏิบัติงานตั้งต้น (บริบทหน่วยไตเทียม) ครั้งแรกครั้งเดียว
+ *  - รับ/ส่งข้อมูลเป็น JSON ให้หน้าเว็บ (GitHub Pages หรือที่อื่น)
+ *
+ *  วิธีติดตั้ง
+ *   1) วางโค้ดนี้แทนโค้ดเดิมทั้งหมดใน Code.gs แล้วกดบันทึก
+ *   2) เลือกฟังก์ชัน setup แล้วกด "เรียกใช้" 1 ครั้ง (อนุญาตสิทธิ์)
+ *   3) ทำให้ใช้งานได้ > จัดการการทำให้ใช้งานได้ > แก้ไข (รูปดินสอ)
+ *      > เวอร์ชัน: "เวอร์ชันใหม่" > ทำให้ใช้งานได้
+ *      (ดำเนินการในฐานะ: ฉัน / ผู้มีสิทธิ์เข้าถึง: ทุกคน)
+ * ============================================================
+ */
+
+// ว่างไว้ = ใช้ Google Sheet ที่ผูกกับสคริปต์นี้
+// ถ้าสคริปต์ไม่ได้ผูกกับชีต ระบบจะสร้างชีตใหม่ชื่อ "Action Plan หน่วยไตเทียม" ให้เอง
+const SPREADSHEET_ID = '';
+const TZ = 'Asia/Bangkok';
+const MONTHS = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
+
+const SHEETS = {
+  settings: {
+    name: 'ตั้งค่า',
+    headers: ['คีย์', 'ค่า', 'คำอธิบาย'],
+    widths: [140, 320, 320]
+  },
+  strategies: {
+    name: 'ยุทธศาสตร์',
+    headers: ['ลำดับ', 'ชื่อยุทธศาสตร์'],
+    widths: [70, 620]
+  },
+  staff: {
+    name: 'บุคลากร',
+    headers: ['ลำดับ', 'ชื่อ', 'ตำแหน่ง'],
+    widths: [70, 180, 360]
+  },
+  projects: {
+    name: 'แผนงาน',
+    headers: ['รหัสแผนงาน', 'ยุทธศาสตร์ที่', 'ลำดับ', 'เป้าประสงค์/โครงการ', 'ผลผลิต/ตัวชี้วัด', 'งบประมาณ', 'ผู้รับผิดชอบ', 'วันที่บันทึก', 'วันที่แก้ไข'],
+    widths: [120, 90, 60, 340, 420, 120, 170, 130, 130],
+    wrap: true
+  },
+  activities: {
+    name: 'กิจกรรม',
+    headers: ['รหัสกิจกรรม', 'รหัสแผนงาน', 'ลำดับ', 'กิจกรรม'].concat(MONTHS),
+    widths: [120, 120, 60, 420].concat(MONTHS.map(function () { return 46; })),
+    wrap: true,
+    centerFrom: 5
+  }
+};
+
+const SETTING_DEFAULTS = [
+  ['unitName', 'หน่วยไตเทียม', 'ชื่อหน่วยงาน (แสดงในหัวเอกสาร)'],
+  ['fiscalYear', '2569', 'ปีงบประมาณ'],
+  ['orgLine', 'กลุ่มการพยาบาล สถาบันบำราศนราดูร', 'สังกัด (บรรทัดที่สองของหัวเอกสาร)'],
+  ['headName', 'อ้อมอารีย์', 'หัวหน้าหน่วยงาน'],
+  ['headPosition', 'หัวหน้าหน่วยไตเทียม', 'ตำแหน่งหัวหน้าหน่วยงาน'],
+  ['seeded', '', 'ระบบใช้ตรวจว่าใส่ข้อมูลตั้งต้นแล้ว (กรุณาอย่าลบ)']
+];
+const EDITABLE_SETTINGS = ['unitName', 'fiscalYear', 'orgLine', 'headName', 'headPosition'];
+
+/* ===================== Web App entry ===================== */
+
+function doGet(e) {
+  try {
+    const action = (e && e.parameter && e.parameter.action) || 'getAll';
+    if (action === 'ping') return jsonOut_({ ok: true, pong: true, time: nowStr_() });
+    return jsonOut_(getAll_());
+  } catch (err) {
+    return jsonOut_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+function doPost(e) {
+  try {
+    let body;
+    try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
+    catch (x) { return jsonOut_({ ok: false, error: 'ข้อมูลที่ส่งมาไม่อยู่ในรูปแบบ JSON' }); }
+    const action = body.action || 'getAll';
+    const data = body.data || {};
+    switch (action) {
+      case 'getAll': return jsonOut_(getAll_());
+      case 'saveProject': return jsonOut_(withLock_(function () { return saveProject_(data); }));
+      case 'deleteProject': return jsonOut_(withLock_(function () { return deleteProject_(data.id); }));
+      case 'saveSettings': return jsonOut_(withLock_(function () { return saveSettings_(data); }));
+      case 'saveStrategies': return jsonOut_(withLock_(function () { return saveStrategies_(data.list || []); }));
+      case 'saveStaff': return jsonOut_(withLock_(function () { return saveStaff_(data.list || []); }));
+      default: return jsonOut_({ ok: false, error: 'ไม่รู้จักคำสั่ง: ' + action });
+    }
+  } catch (err) {
+    return jsonOut_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+/** เรียกใช้ครั้งแรกในหน้าแก้ไขสคริปต์ เพื่อสร้างชีตและอนุญาตสิทธิ์ */
+function setup() {
+  const T = ensureSchema_();
+  Logger.log('พร้อมใช้งาน: ' + T.ss.getUrl());
+  return T.ss.getUrl();
+}
+
+/* ===================== Schema ===================== */
+
+function getSS_() {
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+  let ss = null;
+  try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { ss = null; }
+  if (ss) return ss;
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('SHEET_ID');
+  if (id) return SpreadsheetApp.openById(id);
+  ss = SpreadsheetApp.create('Action Plan หน่วยไตเทียม');
+  props.setProperty('SHEET_ID', ss.getId());
+  return ss;
+}
+
+function ensureSheet_(ss, def) {
+  let sh = ss.getSheetByName(def.name);
+  let created = false;
+  if (!sh) { sh = ss.insertSheet(def.name); created = true; }
+  const lastCol = Math.max(sh.getLastColumn(), 1);
+  let header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (v) { return String(v).trim(); });
+  while (header.length && header[header.length - 1] === '') header.pop();
+  const missing = def.headers.filter(function (h) { return header.indexOf(h) === -1; });
+  if (missing.length) {
+    sh.getRange(1, header.length + 1, 1, missing.length).setValues([missing]);
+    header = header.concat(missing);
+    sh.getRange(1, 1, 1, header.length)
+      .setFontWeight('bold').setBackground('#0f2150').setFontColor('#f3d27a')
+      .setVerticalAlignment('middle').setHorizontalAlignment('center');
+    sh.setFrozenRows(1);
+  }
+  if (created) formatNewSheet_(sh, def);
+  const map = {};
+  header.forEach(function (h, i) { if (h) map[h] = i; });
+  return { sh: sh, header: header, map: map };
+}
+
+function formatNewSheet_(sh, def) {
+  try {
+    (def.widths || []).forEach(function (w, i) { sh.setColumnWidth(i + 1, w); });
+    const rows = Math.max(sh.getMaxRows() - 1, 1);
+    if (def.wrap) sh.getRange(2, 1, rows, def.headers.length).setWrap(true).setVerticalAlignment('top');
+    if (def.centerFrom) {
+      sh.getRange(2, def.centerFrom, rows, def.headers.length - def.centerFrom + 1).setHorizontalAlignment('center');
+    }
+  } catch (e) { /* การจัดรูปแบบไม่จำเป็นต่อการทำงาน */ }
+}
+
+function ensureSchema_() {
+  const ss = getSS_();
+  const T = { ss: ss };
+  Object.keys(SHEETS).forEach(function (k) { T[k] = ensureSheet_(ss, SHEETS[k]); });
+
+  // ค่าตั้งต้นที่ยังไม่มี
+  const keys = readRows_(T.settings).map(function (r) { return String(r[T.settings.map['คีย์']]).trim(); });
+  const addSettings = SETTING_DEFAULTS.filter(function (d) { return keys.indexOf(d[0]) === -1; })
+    .map(function (d) { return rowFrom_(T.settings, { 'คีย์': d[0], 'ค่า': d[1], 'คำอธิบาย': d[2] }); });
+  appendRows_(T.settings, addSettings);
+
+  if (readRows_(T.strategies).length === 0) {
+    appendRows_(T.strategies, SEED_STRATEGIES.map(function (s, i) {
+      return rowFrom_(T.strategies, { 'ลำดับ': i + 1, 'ชื่อยุทธศาสตร์': s });
+    }));
+  }
+  if (readRows_(T.staff).length === 0) {
+    appendRows_(T.staff, SEED_STAFF.map(function (s, i) {
+      return rowFrom_(T.staff, { 'ลำดับ': i + 1, 'ชื่อ': s[0], 'ตำแหน่ง': s[1] });
+    }));
+  }
+
+  const settings = readSettings_(T);
+  if (settings.seeded !== 'yes') {
+    if (readRows_(T.projects).length === 0) seedProjects_(T);
+    setSetting_(T, 'seeded', 'yes');
+  }
+  return T;
+}
+
+/* ===================== Read ===================== */
+
+function getAll_(T) {
+  T = T || ensureSchema_();
+  const settings = readSettings_(T);
+  delete settings.seeded;
+
+  const sm = T.strategies.map;
+  const strategies = readRows_(T.strategies)
+    .map(function (r) { return { no: toNum_(r[sm['ลำดับ']]), name: toStr_(r[sm['ชื่อยุทธศาสตร์']]) }; })
+    .filter(function (s) { return s.name; })
+    .sort(function (a, b) { return a.no - b.no; });
+
+  const fm = T.staff.map;
+  const staff = readRows_(T.staff)
+    .map(function (r) { return { order: toNum_(r[fm['ลำดับ']]), name: toStr_(r[fm['ชื่อ']]), position: toStr_(r[fm['ตำแหน่ง']]) }; })
+    .filter(function (s) { return s.name; })
+    .sort(function (a, b) { return a.order - b.order; });
+
+  const am = T.activities.map;
+  const actsByProject = {};
+  readRows_(T.activities).forEach(function (r) {
+    const pid = toStr_(r[am['รหัสแผนงาน']]);
+    if (!pid) return;
+    (actsByProject[pid] = actsByProject[pid] || []).push({
+      id: toStr_(r[am['รหัสกิจกรรม']]),
+      order: toNum_(r[am['ลำดับ']]),
+      text: toStr_(r[am['กิจกรรม']]),
+      months: MONTHS.map(function (m) { return isOn_(r[am[m]]); })
+    });
+  });
+
+  const pm = T.projects.map;
+  const projects = readRows_(T.projects)
+    .map(function (r) {
+      const id = toStr_(r[pm['รหัสแผนงาน']]);
+      return {
+        id: id,
+        strategyNo: toNum_(r[pm['ยุทธศาสตร์ที่']]),
+        order: toNum_(r[pm['ลำดับ']]),
+        title: toStr_(r[pm['เป้าประสงค์/โครงการ']]),
+        indicators: toStr_(r[pm['ผลผลิต/ตัวชี้วัด']]),
+        budget: toStr_(r[pm['งบประมาณ']]),
+        responsible: toStr_(r[pm['ผู้รับผิดชอบ']]),
+        createdAt: fmtDate_(r[pm['วันที่บันทึก']]),
+        updatedAt: fmtDate_(r[pm['วันที่แก้ไข']]),
+        activities: (actsByProject[id] || []).sort(function (a, b) { return a.order - b.order; })
+      };
+    })
+    .filter(function (p) { return p.id; })
+    .sort(function (a, b) { return (a.strategyNo - b.strategyNo) || (a.order - b.order); });
+
+  return {
+    ok: true,
+    settings: settings,
+    strategies: strategies,
+    staff: staff,
+    projects: projects,
+    months: MONTHS,
+    sheetUrl: T.ss.getUrl(),
+    serverTime: nowStr_()
+  };
+}
+
+/* ===================== Write ===================== */
+
+function saveProject_(p) {
+  if (!p || !String(p.title || '').trim()) throw new Error('กรุณาระบุเป้าประสงค์/โครงการ');
+  const T = ensureSchema_();
+  const pm = T.projects.map;
+  const now = new Date();
+  const id = toStr_(p.id) || newId_('P');
+
+  const rows = readRaw_(T.projects);
+  const idx = rows.findIndex(function (r) { return toStr_(r[pm['รหัสแผนงาน']]) === id; });
+  const row = idx >= 0 ? rows[idx] : blankRow_(T.projects);
+  setCell_(T.projects, row, 'รหัสแผนงาน', id);
+  setCell_(T.projects, row, 'ยุทธศาสตร์ที่', toNum_(p.strategyNo) || 1);
+  setCell_(T.projects, row, 'ลำดับ', toNum_(p.order) || nextOrder_(rows, pm, toNum_(p.strategyNo) || 1));
+  setCell_(T.projects, row, 'เป้าประสงค์/โครงการ', String(p.title).trim());
+  setCell_(T.projects, row, 'ผลผลิต/ตัวชี้วัด', toStr_(p.indicators));
+  setCell_(T.projects, row, 'งบประมาณ', toStr_(p.budget));
+  setCell_(T.projects, row, 'ผู้รับผิดชอบ', toStr_(p.responsible));
+  if (idx < 0) setCell_(T.projects, row, 'วันที่บันทึก', now);
+  setCell_(T.projects, row, 'วันที่แก้ไข', now);
+
+  if (idx >= 0) T.projects.sh.getRange(idx + 2, 1, 1, row.length).setValues([row]);
+  else appendRows_(T.projects, [row]);
+
+  // แทนที่กิจกรรมทั้งหมดของแผนงานนี้
+  const am = T.activities.map;
+  const kept = readRows_(T.activities).filter(function (r) {
+    return toStr_(r[am['รหัสแผนงาน']]) !== id && r.some(function (v) { return v !== '' && v !== null; });
+  });
+  const acts = (p.activities || []).filter(function (a) { return String(a.text || '').trim(); });
+  const newRows = acts.map(function (a, i) {
+    const obj = { 'รหัสกิจกรรม': toStr_(a.id) || newId_('A'), 'รหัสแผนงาน': id, 'ลำดับ': i + 1, 'กิจกรรม': String(a.text).trim() };
+    MONTHS.forEach(function (m, mi) { obj[m] = (a.months && a.months[mi]) ? '✓' : ''; });
+    return rowFrom_(T.activities, obj);
+  });
+  writeRows_(T.activities, kept.concat(newRows));
+
+  const out = getAll_(T);
+  out.savedId = id;
+  return out;
+}
+
+function deleteProject_(id) {
+  id = toStr_(id);
+  if (!id) throw new Error('ไม่พบรหัสแผนงาน');
+  const T = ensureSchema_();
+  const pm = T.projects.map;
+  const rows = readRaw_(T.projects);
+  const idx = rows.findIndex(function (r) { return toStr_(r[pm['รหัสแผนงาน']]) === id; });
+  if (idx >= 0) T.projects.sh.deleteRow(idx + 2);
+  const am = T.activities.map;
+  const kept = readRows_(T.activities).filter(function (r) {
+    return toStr_(r[am['รหัสแผนงาน']]) !== id && r.some(function (v) { return v !== '' && v !== null; });
+  });
+  writeRows_(T.activities, kept);
+  return getAll_(T);
+}
+
+function saveSettings_(obj) {
+  const T = ensureSchema_();
+  EDITABLE_SETTINGS.forEach(function (k) {
+    if (obj && Object.prototype.hasOwnProperty.call(obj, k)) setSetting_(T, k, toStr_(obj[k]));
+  });
+  return getAll_(T);
+}
+
+function saveStrategies_(list) {
+  const T = ensureSchema_();
+  const clean = list
+    .map(function (s) { return { no: toNum_(s.no), name: toStr_(s.name).trim() }; })
+    .filter(function (s) { return s.name; });
+  if (!clean.length) throw new Error('ต้องมียุทธศาสตร์อย่างน้อย 1 รายการ');
+  writeRows_(T.strategies, clean.map(function (s, i) {
+    return rowFrom_(T.strategies, { 'ลำดับ': s.no || i + 1, 'ชื่อยุทธศาสตร์': s.name });
+  }));
+  return getAll_(T);
+}
+
+function saveStaff_(list) {
+  const T = ensureSchema_();
+  const clean = list
+    .map(function (s) { return { name: toStr_(s.name).trim(), position: toStr_(s.position).trim() }; })
+    .filter(function (s) { return s.name; });
+  writeRows_(T.staff, clean.map(function (s, i) {
+    return rowFrom_(T.staff, { 'ลำดับ': i + 1, 'ชื่อ': s.name, 'ตำแหน่ง': s.position });
+  }));
+  return getAll_(T);
+}
+
+/* ===================== Helpers ===================== */
+
+function withLock_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function readRaw_(t) {
+  const last = t.sh.getLastRow();
+  if (last < 2) return [];
+  return t.sh.getRange(2, 1, last - 1, t.header.length).getValues();
+}
+
+function readRows_(t) {
+  return readRaw_(t).filter(function (r) { return r.some(function (v) { return v !== '' && v !== null; }); });
+}
+
+function writeRows_(t, rows) {
+  const last = t.sh.getLastRow();
+  if (last >= 2) t.sh.getRange(2, 1, last - 1, t.header.length).clearContent();
+  if (rows.length) t.sh.getRange(2, 1, rows.length, t.header.length).setValues(rows);
+}
+
+function appendRows_(t, rows) {
+  if (!rows.length) return;
+  const start = Math.max(t.sh.getLastRow(), 1) + 1;
+  t.sh.getRange(start, 1, rows.length, t.header.length).setValues(rows);
+}
+
+function blankRow_(t) { return t.header.map(function () { return ''; }); }
+
+function rowFrom_(t, obj) {
+  const row = blankRow_(t);
+  Object.keys(obj).forEach(function (k) { if (k in t.map) row[t.map[k]] = obj[k]; });
+  return row;
+}
+
+function setCell_(t, row, key, val) { if (key in t.map) row[t.map[key]] = val; }
+
+function readSettings_(T) {
+  const m = T.settings.map;
+  const out = {};
+  readRows_(T.settings).forEach(function (r) {
+    const k = toStr_(r[m['คีย์']]).trim();
+    if (k) out[k] = toStr_(r[m['ค่า']]);
+  });
+  return out;
+}
+
+function setSetting_(T, key, value) {
+  const m = T.settings.map;
+  const last = T.settings.sh.getLastRow();
+  if (last >= 2) {
+    const keys = T.settings.sh.getRange(2, m['คีย์'] + 1, last - 1, 1).getValues();
+    for (let i = 0; i < keys.length; i++) {
+      if (String(keys[i][0]).trim() === key) {
+        T.settings.sh.getRange(i + 2, m['ค่า'] + 1).setValue(value);
+        return;
+      }
+    }
+  }
+  appendRows_(T.settings, [rowFrom_(T.settings, { 'คีย์': key, 'ค่า': value })]);
+}
+
+function nextOrder_(rows, pm, strategyNo) {
+  let max = 0;
+  rows.forEach(function (r) {
+    if (toNum_(r[pm['ยุทธศาสตร์ที่']]) === strategyNo) max = Math.max(max, toNum_(r[pm['ลำดับ']]));
+  });
+  return max + 1;
+}
+
+function newId_(prefix) { return prefix + Utilities.getUuid().replace(/-/g, '').slice(0, 10); }
+function toStr_(v) { return v === null || v === undefined ? '' : (v instanceof Date ? fmtDate_(v) : String(v)); }
+function toNum_(v) { const n = Number(v); return isFinite(n) ? n : 0; }
+function isOn_(v) {
+  if (v === true) return true;
+  const s = String(v === null || v === undefined ? '' : v).trim().toLowerCase();
+  return s !== '' && s !== '0' && s !== 'false' && s !== '-' && s !== 'no';
+}
+function fmtDate_(v) {
+  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd HH:mm');
+  return v ? String(v) : '';
+}
+function nowStr_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'); }
+
+/* ===================== ข้อมูลตั้งต้น (บริบทหน่วยไตเทียม) ===================== */
+
+const SEED_STRATEGIES = [
+  'ยกระดับคุณภาพบริการพยาบาลด้านโรคติดเชื้อและโรคอุบัติใหม่สู่ความเป็นเลิศ',
+  'พัฒนาระบบบริหารจัดการทางการพยาบาลให้มีประสิทธิภาพ',
+  'เสริมสร้างศักยภาพบุคลากรทางการพยาบาลให้มีความเชี่ยวชาญ',
+  'ส่งเสริมการสร้างองค์ความรู้ วิจัยและนวัตกรรมทางการพยาบาล',
+  'พัฒนาระบบเทคโนโลยีสารสนเทศเพื่อการพยาบาล'
+];
+
+const SEED_STAFF = [
+  ['อ้อมอารีย์', 'หัวหน้าหน่วยไตเทียม'],
+  ['สุกัญญา', 'พยาบาลวิชาชีพ หน่วยไตเทียม']
+];
+
+// เดือนในปีงบประมาณ: 0=ต.ค. 1=พ.ย. 2=ธ.ค. 3=ม.ค. 4=ก.พ. 5=มี.ค. 6=เม.ย. 7=พ.ค. 8=มิ.ย. 9=ก.ค. 10=ส.ค. 11=ก.ย.
+function R_(a, b) { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; }
+const ALL_YEAR = R_(0, 11);
+const Q3 = [2, 5, 8, 11];
+
+const SEED_PROJECTS = [
+  // ---------- ยุทธศาสตร์ที่ 1 ----------
+  {
+    s: 1, title: 'พัฒนาแนวทางเฝ้าระวังและป้องกันการติดเชื้อในผู้ป่วยวิกฤตที่ได้รับการฟอกเลือดด้วยเครื่องไตเทียม',
+    acts: [
+      ['ทบทวน ค้นหาปัญหา และวิเคราะห์ข้อมูลการติดเชื้อที่สัมพันธ์กับสายสวนหลอดเลือดดำสำหรับฟอกเลือด (DLC)', [0, 1]],
+      ['ศึกษางานวิจัยและหลักฐานเชิงประจักษ์ที่เกี่ยวข้อง', [1, 2]],
+      ['ปรับปรุงแนวปฏิบัติการดูแลสายสวนหลอดเลือดดำสำหรับฟอกเลือด (DLC care bundle) และแนวทางป้องกันการแพร่กระจายเชื้อไวรัสตับอักเสบบี ซี และเอชไอวีในหน่วยไตเทียม', [2, 3]],
+      ['นำแนวปฏิบัติไปทดลองใช้และปรับแก้ไข', [3, 4, 5]],
+      ['ประเมินติดตามผลการปฏิบัติทุก 3 เดือน', [5, 8, 11]],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'อัตราการติดเชื้อในกระแสเลือดสัมพันธ์กับสายสวนหลอดเลือดดำสำหรับฟอกเลือด (เป้าหมาย: < 1 ครั้ง/1,000 วันคาสายสวน)',
+      'อุบัติการณ์ผลเลือดเปลี่ยนเป็นบวกของไวรัสตับอักเสบบี ซี ในหน่วยไตเทียม (เป้าหมาย: 0)',
+      'ร้อยละของการปฏิบัติตามแนวทางการพยาบาล (เป้าหมาย: ≥ 90%)',
+      'ร้อยละความพึงพอใจของบุคลากรต่อการใช้แนวทางปฏิบัติ (เป้าหมาย: > 90%)'
+    ],
+    budget: 'ไม่มี', resp: 'อ้อมอารีย์, สุกัญญา'
+  },
+  {
+    s: 1, title: 'พัฒนาความพร้อมการฟอกเลือดข้างเตียงสำหรับผู้ป่วยโรคติดเชื้ออุบัติใหม่อุบัติซ้ำในห้องแยกโรคความดันลบ',
+    acts: [
+      ['ทบทวนแนวทางการฟอกเลือดผู้ป่วยโรคติดเชื้ออุบัติใหม่อุบัติซ้ำร่วมกับงานป้องกันและควบคุมการติดเชื้อ (IC)', [0, 1]],
+      ['ตรวจสอบความพร้อมใช้ของเครื่องไตเทียมและเครื่องกรองน้ำบริสุทธิ์ (RO) เคลื่อนที่สำหรับห้องแยกโรค', [1, 2]],
+      ['ฝึกทักษะการสวมและถอดอุปกรณ์ป้องกันส่วนบุคคล (PPE) และการเคลื่อนย้ายเครื่องไตเทียมเข้าห้องแยกโรค', [2, 3]],
+      ['ฝึกซ้อมแผนรับผู้ป่วยโรคติดเชื้ออุบัติใหม่อุบัติซ้ำที่ต้องได้รับการฟอกเลือดร่วมกับหอผู้ป่วยวิกฤต', [4, 5]],
+      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'ร้อยละความพร้อมใช้ของเครื่องไตเทียมและอุปกรณ์สำหรับห้องแยกโรค (เป้าหมาย: 100%)',
+      'บุคลากรในหน่วยงานผ่านการฝึกสวมและถอด PPE (เป้าหมาย: 100%)',
+      'อุบัติการณ์บุคลากรติดเชื้อจากการปฏิบัติงาน (เป้าหมาย: 0)'
+    ],
+    budget: 'งบหน่วยงาน', resp: 'อ้อมอารีย์, สุกัญญา'
+  },
+  {
+    s: 1, title: 'เฝ้าระวังคุณภาพน้ำบริสุทธิ์ (RO) และน้ำยาฟอกเลือดเพื่อความปลอดภัยของผู้ป่วย',
+    acts: [
+      ['ตรวจวัดคุณภาพน้ำ RO ประจำวัน (คลอรีน ความกระด้าง ค่าการนำไฟฟ้า) และบันทึกในระบบติดตาม', ALL_YEAR],
+      ['ส่งตรวจเพาะเชื้อและเอนโดท็อกซินของน้ำ RO และน้ำยาฟอกเลือดตามรอบที่กำหนด', ALL_YEAR],
+      ['เปลี่ยนไส้กรองและล้างฆ่าเชื้อระบบน้ำตามแผนบำรุงรักษา', Q3],
+      ['ทบทวนผลและแก้ไขทันทีเมื่อผลไม่ผ่านเกณฑ์ พร้อมวิเคราะห์ทุก 3 เดือน', Q3],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'ร้อยละผลเพาะเชื้อและเอนโดท็อกซินของน้ำ RO และน้ำยาฟอกเลือดผ่านเกณฑ์มาตรฐาน (เป้าหมาย: 100%)',
+      'อุบัติการณ์ผู้ป่วยเกิดภาวะไข้หนาวสั่นจากสารไพโรเจนระหว่างฟอกเลือด (เป้าหมาย: 0)'
+    ],
+    budget: 'งบหน่วยงาน', resp: 'อ้อมอารีย์, สุกัญญา'
+  },
+  // ---------- ยุทธศาสตร์ที่ 2 ----------
+  {
+    s: 2, title: 'พัฒนาระบบบริหารจัดการอัตรากำลังให้มีประสิทธิภาพและรองรับการฟอกเลือดฉุกเฉินนอกเวลาราชการ',
+    acts: [
+      ['ทบทวน ค้นหาปัญหาภาระงานและการรับผู้ป่วยฟอกเลือดฉุกเฉินนอกเวลาราชการ', [0]],
+      ['ศึกษางานวิจัยที่เกี่ยวข้อง', [0, 1]],
+      ['จัดระบบพยาบาลเวรเรียก (on-call) สำหรับฟอกเลือดฉุกเฉินนอกเวลาราชการ', [1, 2]],
+      ['บันทึกภาระงานรายวันผ่านระบบภาระงานไตเทียม และวิเคราะห์ Productivity รายเดือน', ALL_YEAR],
+      ['ประเมินติดตามผลทุก 3 เดือน', Q3],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'อัตราของหน่วยงานบริการมี Productivity อยู่ในเกณฑ์ที่กำหนด (85–95%)',
+      'ร้อยละผู้ป่วยวิกฤตได้รับการฟอกเลือดฉุกเฉินอย่างทันท่วงทีตามเวลาที่กำหนด (เป้าหมาย: ≥ 90%)'
+    ],
+    budget: 'ไม่มี', resp: 'อ้อมอารีย์'
+  },
+  {
+    s: 2, title: 'พัฒนาความรู้และทักษะบุคลากรในหน่วยงาน',
+    acts: [
+      ['จัดบุคลากรเข้าอบรมตามแผนของกลุ่มการพยาบาลและงานป้องกันและควบคุมการติดเชื้อ (IC)', ALL_YEAR],
+      ['จัดบุคลากรเข้าอบรมการช่วยฟื้นคืนชีพ (CPR)', [2, 3]],
+      ['จัดบุคลากรเข้าอบรมฟื้นฟูวิชาการการพยาบาลโรคไตและการบำบัดทดแทนไตในผู้ป่วยวิกฤต', R_(4, 9)],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'บุคลากรในหน่วยงานผ่านการอบรมด้านการป้องกันและควบคุมการติดเชื้อ คนละ 2 ครั้ง/ปี',
+      'บุคลากรในหน่วยงานเข้าอบรม CPR 100%',
+      'บุคลากรในหน่วยงานผ่านการอบรมฟื้นฟูวิชาการการพยาบาลโรคไต อย่างน้อย 1 ครั้ง/คน/ปี'
+    ],
+    budget: 'ตามแผนกลุ่มการพยาบาล', resp: 'อ้อมอารีย์'
+  },
+  {
+    s: 2, title: 'การจัดซื้อวัสดุ ครุภัณฑ์ และจัดการสิ่งแวดล้อมในหน่วยงาน',
+    acts: [
+      ['สำรวจวัสดุ ครุภัณฑ์ เครื่องไตเทียม เครื่องกรองน้ำ RO เคลื่อนที่ และสิ่งแวดล้อมในหน่วยงาน', [0, 1]],
+      ['ส่งแผนจัดซื้อวัสดุและครุภัณฑ์', [5]],
+      ['ติดตามการบำรุงรักษาเชิงป้องกัน (PM) และการสอบเทียบเครื่องไตเทียมตามกำหนด', ALL_YEAR],
+      ['ตรวจสอบวัสดุคงคลังและความพร้อมใช้ของอุปกรณ์ทุกเดือน', ALL_YEAR]
+    ],
+    kpi: [
+      'หน่วยงานมีเครื่องไตเทียมและอุปกรณ์พร้อมใช้ 100%',
+      'เครื่องไตเทียมได้รับการบำรุงรักษาและสอบเทียบตามกำหนด 100%',
+      'จัดซื้อได้ตามกำหนดเวลา'
+    ],
+    budget: 'งบประมาณประจำปี', resp: 'อ้อมอารีย์, สุกัญญา'
+  },
+  // ---------- ยุทธศาสตร์ที่ 3 ----------
+  {
+    s: 3, title: 'การพัฒนาการใช้กระบวนการพยาบาลในกลุ่มโรคเสี่ยงสูงที่ได้รับการฟอกเลือด ได้แก่ AKI, Sepsis, ESRD ที่มีภาวะแทรกซ้อนเฉียบพลัน และโรคติดเชื้ออุบัติใหม่อุบัติซ้ำ',
+    acts: [
+      ['หัวหน้าหน่วยนิเทศการใช้กระบวนการพยาบาล', R_(0, 3)],
+      ['จัดทำแนวปฏิบัติการพยาบาลทางคลินิก (CNPG) การพยาบาลผู้ป่วยวิกฤตที่ได้รับการฟอกเลือด 4 กลุ่มโรค', R_(1, 3)],
+      ['นำแนวปฏิบัติไปใช้และเฝ้าระวังภาวะแทรกซ้อนระหว่างฟอกเลือด เช่น ความดันโลหิตต่ำ ภาวะโพแทสเซียมในเลือดผิดปกติ', R_(3, 11)],
+      ['สุ่มตรวจบันทึกทางการพยาบาล (HD Flow Sheet/Nursing Note) ของกลุ่มโรคเสี่ยงสูงทั้ง 4 กลุ่ม ให้ครบถ้วนตามกระบวนการพยาบาล', R_(3, 11)],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'ร้อยละความสมบูรณ์ของการบันทึกทางการพยาบาล (เป้าหมาย: ≥ 85%)',
+      'มีการนำกระบวนการพยาบาลมาใช้ 100%',
+      'ร้อยละของการปฏิบัติตามแนวทางการพยาบาล (เป้าหมาย: ≥ 90%)'
+    ],
+    budget: 'ไม่มี', resp: 'อ้อมอารีย์, สุกัญญา'
+  },
+  // ---------- ยุทธศาสตร์ที่ 4 ----------
+  {
+    s: 4, title: 'ส่งเสริมให้บุคลากรเข้าร่วมงานวิชาการของสถาบันฯ',
+    acts: [
+      ['กระตุ้นให้บุคลากรในหน่วยงานส่งผลงาน เช่น CQI นวัตกรรม ข้อเสนอแนะ', ALL_YEAR],
+      ['ให้บุคลากรเข้าร่วมการอบรมนักวิจัยของกลุ่มการพยาบาล', R_(3, 5)],
+      ['หัวหน้านิเทศติดตามความก้าวหน้าการทำ CQI นวัตกรรม และงานวิจัย', Q3],
+      ['ใช้บริการคลินิกวิจัยทางการพยาบาลเพื่อเป็นพี่เลี้ยงให้คำปรึกษาแก่บุคลากรในหน่วยงาน', R_(3, 9)],
+      ['สรุปจำนวนผลงาน CQI นวัตกรรม และงานวิจัยที่แล้วเสร็จ', [11]]
+    ],
+    kpi: [
+      'จำนวนผลงานวิจัย/นวัตกรรม/CQI ทางการพยาบาลที่แล้วเสร็จ (เป้าหมาย: ≥ 3 เรื่องต่อปี)',
+      'จำนวนผลงานที่ได้รับการนำเสนอในเวทีวิชาการภายนอก (เป้าหมาย: ≥ 1 เรื่องต่อปี)'
+    ],
+    budget: 'ไม่มี', resp: 'อ้อมอารีย์'
+  },
+  {
+    s: 4, title: 'CQI เรื่อง การพัฒนาแบบบันทึกการเฝ้าระวังสัญญาณชีพระหว่างฟอกเลือดสำหรับผู้ป่วยวิกฤต',
+    acts: [
+      ['วิเคราะห์หาสาเหตุและปัญหา', [0, 1]],
+      ['ศึกษางานหรือนวัตกรรมที่เกี่ยวข้อง', [1, 2]],
+      ['ร่วมกันพัฒนาแบบบันทึก', [2, 3]],
+      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'ร้อยละการบันทึกสัญญาณชีพระหว่างฟอกเลือดครบถ้วนตามแบบบันทึก (เป้าหมาย: ≥ 90%)',
+      'ความพึงพอใจในการใช้ของเจ้าหน้าที่ > 90%'
+    ],
+    budget: 'งบหน่วยงาน', resp: 'สุกัญญา'
+  },
+  {
+    s: 4, title: 'CQI เรื่อง ชุดเตรียมพร้อมฟอกเลือดเคลื่อนที่ (Mobile HD Ready Box) สำหรับฟอกเลือดข้างเตียงในหอผู้ป่วยวิกฤตและห้องแยกโรค',
+    acts: [
+      ['วิเคราะห์หาสาเหตุและปัญหา', [0, 1]],
+      ['ศึกษางานหรือนวัตกรรมที่เกี่ยวข้อง', [1, 2]],
+      ['ร่วมกันสร้างนวัตกรรม', [2, 3]],
+      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'การเตรียมอุปกรณ์ฟอกเลือดข้างเตียงครบถ้วนถูกต้อง (เป้าหมาย: 100%)',
+      'ความพึงพอใจในการใช้ของเจ้าหน้าที่ > 90%'
+    ],
+    budget: 'งบหน่วยงาน', resp: 'อ้อมอารีย์, สุกัญญา'
+  },
+  // ---------- ยุทธศาสตร์ที่ 5 ----------
+  {
+    s: 5, title: 'พัฒนาการให้คำแนะนำผู้ป่วยและญาติเมื่อเข้ารับการฟอกเลือดด้วยเครื่องไตเทียม',
+    acts: [
+      ['ทบทวนปัญหา', [0]],
+      ['จัดทำสื่อความรู้ (แผ่นพับ/E-Book) เรื่องการปฏิบัติตัวก่อนและหลังฟอกเลือด และการดูแลสายสวนหลอดเลือดดำสำหรับฟอกเลือด', [1, 2]],
+      ['จัดทำ QR code เข้าถึงคลังความรู้สำหรับผู้ป่วยและญาติ', [2, 3]],
+      ['ประเมินติดตามผลทุก 3 เดือน', [5, 8, 11]],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'มี QR code สื่อความรู้สำหรับผู้ป่วยและญาติ',
+      'ร้อยละความพึงพอใจของผู้ป่วยและญาติต่อการให้คำแนะนำผ่าน QR code (เป้าหมาย: > 90%)'
+    ],
+    budget: 'ไม่มี', resp: 'สุกัญญา'
+  },
+  {
+    s: 5, title: 'พัฒนาระบบสารสนเทศติดตามภาระงาน ตัวชี้วัด และความเสี่ยงของหน่วยไตเทียม',
+    acts: [
+      ['ทบทวนความต้องการใช้ข้อมูลของหน่วยงาน', [0]],
+      ['พัฒนาและปรับปรุงระบบบันทึกภาระงาน Dashboard ตัวชี้วัด และทะเบียนความเสี่ยง', R_(1, 3)],
+      ['บันทึกข้อมูลและรายงานตัวชี้วัดรายเดือน', ALL_YEAR],
+      ['ประเมินผลการใช้งานทุก 3 เดือน', [5, 8, 11]],
+      ['สรุปผลการดำเนินงาน', [11]]
+    ],
+    kpi: [
+      'รายงานตัวชี้วัดของหน่วยงานครบถ้วนและทันเวลา (เป้าหมาย: 100%)',
+      'ร้อยละความพึงพอใจของผู้ใช้งานระบบ (เป้าหมาย: > 90%)'
+    ],
+    budget: 'ไม่มี', resp: 'อ้อมอารีย์'
+  }
+];
+
+function seedProjects_(T) {
+  const now = new Date();
+  const order = {};
+  const pRows = [];
+  const aRows = [];
+  SEED_PROJECTS.forEach(function (p) {
+    order[p.s] = (order[p.s] || 0) + 1;
+    const id = newId_('P');
+    pRows.push(rowFrom_(T.projects, {
+      'รหัสแผนงาน': id, 'ยุทธศาสตร์ที่': p.s, 'ลำดับ': order[p.s],
+      'เป้าประสงค์/โครงการ': p.title, 'ผลผลิต/ตัวชี้วัด': p.kpi.join('\n'),
+      'งบประมาณ': p.budget, 'ผู้รับผิดชอบ': p.resp, 'วันที่บันทึก': now, 'วันที่แก้ไข': now
+    }));
+    p.acts.forEach(function (a, i) {
+      const obj = { 'รหัสกิจกรรม': newId_('A'), 'รหัสแผนงาน': id, 'ลำดับ': i + 1, 'กิจกรรม': a[0] };
+      MONTHS.forEach(function (m, mi) { obj[m] = a[1].indexOf(mi) >= 0 ? '✓' : ''; });
+      aRows.push(rowFrom_(T.activities, obj));
+    });
+  });
+  appendRows_(T.projects, pRows);
+  appendRows_(T.activities, aRows);
+}
