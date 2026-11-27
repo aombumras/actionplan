@@ -632,6 +632,124 @@ body.presenting .fab{display:none!important}
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
   .unfold{opacity:1;scale:1 1}
 }
+/* ---------- วิเคราะห์ตำแหน่งงาน (Job Analysis) ---------- */
+.lv{display:inline-flex;align-items:center;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+.lv1{color:#bfe8ff;background:rgba(80,160,230,.16);border-color:rgba(120,190,250,.35)}
+.lv2{color:#ffe2a8;background:rgba(230,170,60,.16);border-color:rgba(240,195,100,.4)}
+.lv3{color:#ffd0e0;background:rgba(220,90,140,.18);border-color:rgba(240,140,180,.42)}
+.lv0{color:#cbd3ee;background:rgba(255,255,255,.06);border-color:var(--line-2)}
+.modal .lv1,.paper .lv1,#printRoot .lv1{color:#11518a;background:#e3f1fd;border-color:#a9cff2}
+.modal .lv2,.paper .lv2,#printRoot .lv2{color:#7a4c00;background:#fff1d4;border-color:#ebc77a}
+.modal .lv3,.paper .lv3,#printRoot .lv3{color:#8a1d48;background:#fde4ee;border-color:#eeaac6}
+.df{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.df1{background:#e3f1fd;color:#11518a}.df2{background:#fff1d4;color:#7a4c00}.df3{background:#fde4ee;color:#8a1d48}.df0{background:#eef0f6;color:#6b7394}
+.jd-stats{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));margin:4px 0 24px}
+.jd-stat{padding:16px 18px;--cs:40px;display:grid;gap:2px}
+.jd-stat small{color:var(--muted);font-size:13px}
+.jd-stat b{font-family:var(--f-head);font-size:32px;line-height:1.15;color:var(--gold-l)}
+.jd-stat b i{font-style:normal;font-size:18px;color:var(--muted)}
+.jd-stat span{font-size:13px;color:#cbd3ee}
+.jd-stat.ok b{color:var(--ok)}.jd-stat.warn b{color:#ffcf6e}.jd-stat.bad b{color:var(--bad)}
+.df-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));margin-bottom:26px}
+.df-card{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;--cs:40px}
+.df-n{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-deco);font-weight:700;font-size:20px;color:#14204a}
+.df-card.d1 .df-n{background:linear-gradient(180deg,#d8eeff,#8fc4f0)}.df-card.d2 .df-n{background:linear-gradient(180deg,#fff0c8,#e7b85a)}.df-card.d3 .df-n{background:linear-gradient(180deg,#ffe0ec,#e58ab0)}
+.df-card b{font-size:16px}.df-card p{margin:4px 0;font-size:14px;color:#cbd3ee;line-height:1.55}.df-card small{color:var(--gold-l);font-size:12.5px}
+.jd-grid{display:grid;gap:22px;grid-template-columns:1fr;margin-bottom:26px}
+@media (min-width:1280px){.jd-grid{grid-template-columns:1fr 1fr}}
+.jd{padding:20px clamp(14px,2.4vw,24px) 18px;--cs:62px}
+.jd-head{display:flex;gap:12px;align-items:flex-start}
+.jd-t{flex:1;min-width:0}
+.jd-t h4{margin:6px 0 2px;font-family:var(--f-head);font-size:clamp(17px,2vw,20px);line-height:1.4}
+.jd-t small{color:var(--muted);font-size:13px}
+.jd-purpose{margin:12px 0 0;padding:10px 14px;border-left:3px solid var(--gold);background:rgba(212,167,60,.07);border-radius:0 10px 10px 0;font-size:14.5px;line-height:1.6}
+.jd-duties{display:grid;gap:10px 18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.jd-duties h5{margin:0 0 4px;font-size:13.5px;color:var(--gold-l);font-weight:700}
+.jd ul{margin:0;padding-left:20px;font-size:14px;line-height:1.6}
+.jd ul li{margin:2px 0}
+.jd-p{margin:0;font-size:14.5px;line-height:1.6}
+.jd .z,.paper .z{color:var(--muted);font-size:13px;margin:0}
+.jd-meter{display:flex;align-items:center;gap:5px;margin:0 0 6px}
+.jd-meter i{width:34px;height:8px;border-radius:999px;background:rgba(255,255,255,.1)}
+.jd-meter i.on{background:linear-gradient(90deg,#f3d27a,#d4a73c)}
+.jd-meter span{margin-left:8px;font-size:13.5px;color:var(--gold-l);font-weight:700}
+.jd-load{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:12px;border-top:1px dashed var(--line-2)}
+.jd-load span{display:inline-flex;align-items:baseline;gap:6px;font-size:13px;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--line-2);color:#cbd3ee}
+.jd-load b{font-size:16px;color:var(--gold-l)}
+.jd-load em{font-style:normal;color:var(--muted)}
+table.doc.mx{min-width:760px}
+table.doc.mx thead th small{display:block;font-weight:500;font-size:12px;color:#5b6690}
+table.doc.mx td.mx-p{min-width:260px;font-weight:600}
+table.doc.mx td.mx-c{text-align:center;vertical-align:middle;min-width:110px}
+table.doc.mx td.mx-c small{display:block;color:#5b6690;font-size:12px;margin-top:3px}
+table.doc.mx td.mx-c sup{color:#8a1d48;font-weight:700;margin-left:1px}
+table.doc.mx td.r-main{background:#fff4d8}
+table.doc.mx td.over{background:#ffe3e3 !important;box-shadow:inset 0 0 0 2px #e07a7a}
+table.doc.mx td.mx-d{text-align:center;vertical-align:middle;white-space:nowrap}
+table.doc.mx tfoot th{background:#e9eef8;color:#0d1d47;text-align:left;font-size:13px}
+table.doc.mx tfoot td{background:#f6ecd0;text-align:center;font-weight:700;color:#0d1d47}
+table.doc.mx tfoot td small{font-weight:500;color:#5b6690}
+.role{display:inline-block;font-size:12.5px;font-weight:700;padding:2px 10px;border-radius:999px}
+.role.r-main{background:linear-gradient(180deg,#183273,#0c1b46);color:#f3d27a}
+.role.r-co{background:#e3eafa;color:#183273;border:1px solid #b7c5ea}
+.role.r-sup{background:#fff;color:#7a5a12;border:1px dashed #c9a24a}
+.mx-note{font-size:12.5px;color:#5b6690;margin:10px 0 0;line-height:1.6}
+.findings{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.findings li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14.5px;line-height:1.55;background:rgba(255,255,255,.03);border:1px solid var(--line-2)}
+.findings li > span{flex:1}
+.findings li > .ico{width:20px;height:20px;flex:none}
+.findings li.bad{border-color:rgba(255,123,123,.45);background:rgba(255,123,123,.07)}.findings li.bad > .ico{color:var(--bad)}
+.findings li.warn{border-color:rgba(255,207,110,.45);background:rgba(255,207,110,.06)}.findings li.warn > .ico{color:#ffcf6e}
+.findings li.info > .ico{color:var(--gold-l)}
+/* ในหน้าต่างแก้ไขแผนงาน */
+.lbl-note{display:block;color:#8e97b8;font-size:12px;font-weight:400}
+.pos-roles{display:grid;gap:8px;margin-bottom:8px}
+.pr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid #e4cf96;border-radius:12px;background:#fffbf0}
+.pr-name{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#14204a;min-width:0}
+.pr-name b{font-size:14.5px}.pr-name small{color:#6b7394;font-size:12.5px}
+.seg{display:inline-flex;border:1px solid #dcc58e;border-radius:10px;overflow:hidden;background:#fff;flex:none}
+.seg button{border:0;background:transparent;padding:7px 12px;font:inherit;font-size:13.5px;color:#3a4572;cursor:pointer;border-left:1px solid #eadcb2}
+.seg button:first-child{border-left:0;color:#9aa1bd}
+.seg button.on{background:linear-gradient(180deg,#183273,#0c1b46);color:#f3d27a}
+.seg button:first-child.on{background:#eef0f6;color:#3a4572}
+.act-meta{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:10px;padding-top:10px;border-top:1px dashed #e4cf96}
+.act-meta label{display:grid;gap:3px;font-size:12.5px;color:#6b7394;flex:1;min-width:170px}
+.act-meta .inp{padding:7px 10px;font-size:14px}
+.act-warn{display:none;align-items:center;gap:6px;font-size:13px;color:#b23a3a;font-weight:600;padding:6px 10px;border-radius:8px;background:#ffe9e9;flex-basis:100%}
+.act-warn.on{display:inline-flex}
+.act-warn .ico{width:16px;height:16px}
+.a-lv{font-style:normal;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:700;margin-left:4px;vertical-align:1px}
+.a-lv.l1{background:#cfe7fb;color:#11518a}.a-lv.l2{background:#ffe7b5;color:#7a4c00}.a-lv.l3{background:#fbd0e1;color:#8a1d48}
+.ed-grid.pos2{grid-template-columns:1fr 190px}
+@media (max-width:560px){.ed-grid.pos2{grid-template-columns:1fr}.seg{width:100%}.seg button{flex:1;padding:8px 4px}}
+.pos-mini{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px}
+.pos-mini li{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.pos-mini li span{color:var(--muted);font-size:13px}
+/* พิมพ์คำบรรยายลักษณะงาน */
+#printRoot{display:none}
+@media print{
+  body.printing > *:not(#printRoot){display:none !important}
+  body.printing #printRoot{display:block;color:#000;font-family:'Sarabun','Taviraj',sans-serif;font-size:14px}
+  body.printing{background:#fff !important}
+  .pj-page{page-break-after:always;break-after:page}
+  .pj-page:last-child{page-break-after:auto;break-after:auto}
+  .pj-h{text-align:center;margin-bottom:10px}.pj-h h2{margin:0;font-size:20px}.pj-h p{margin:2px 0 0}
+  table.pj{width:100%;border-collapse:collapse}
+  table.pj th,table.pj td{border:1px solid #888;padding:6px 8px;vertical-align:top;text-align:left;line-height:1.55}
+  table.pj th{background:#f1f1f1;width:22%;font-weight:700}
+  table.pj ol{margin:2px 0 8px;padding-left:22px}
+  .pj-sub{margin:16px 0 6px;font-size:16px}
+  .pj-keep{break-inside:avoid;page-break-inside:avoid}
+  #printRoot .doc-scroll{overflow:visible}
+  #printRoot table.doc{min-width:0;width:100%;font-size:12px;border-collapse:collapse}
+  #printRoot table.doc th,#printRoot table.doc td{border:1px solid #888;padding:4px 6px}
+  #printRoot .doc-title{text-align:center}#printRoot .doc-title h3{margin:0;font-size:17px}#printRoot .doc-title p{margin:0 0 8px}
+  #printRoot .s-row td{background:#eee;font-weight:700}
+  #printRoot td.over{background:#ffd9d9 !important}
+  #printRoot td.r-main{background:#fff4d8}
+  #printRoot .role.r-main{background:#14204a;color:#fff}
+  @page{size:A4;margin:14mm}
+}
 @media print{body{background:#fff}}
 </style>
 </head>
@@ -926,6 +1044,7 @@ const ROUTES = [
   { id: 'home', th: 'หน้าหลัก', en: 'Overview', ic: 'home' },
   { id: 'plans', th: 'แผนงานตามยุทธศาสตร์', en: 'Strategic Plans', ic: 'plans' },
   { id: 'table', th: 'ตารางแผนปฏิบัติงาน', en: 'Action Plan Table', ic: 'table' },
+  { id: 'jobs', th: 'วิเคราะห์ตำแหน่งงาน', en: 'Job Analysis', ic: 'users' },
   { id: 'pdf', th: 'สร้างไฟล์ PDF', en: 'Export PDF', ic: 'pdf', action: true },
   { id: 'settings', th: 'ตั้งค่า', en: 'Settings', ic: 'gear' }
 ];
@@ -1003,6 +1122,7 @@ function render() {
   if (!S.data) html = viewNoData();
   else if (r.id === 'plans') html = viewPlans(r.arg);
   else if (r.id === 'table') html = viewTable();
+  else if (r.id === 'jobs') html = viewJobs();
   else if (r.id === 'settings') html = viewSettings();
   else html = viewHome();
   v.innerHTML = banner() + html;
@@ -1148,7 +1268,7 @@ function viewPlans(arg) {
   ${groups || `<div class="frame panel empty">${corners()}ไม่พบแผนงานที่ตรงกับคำค้น</div>`}`;
 }
 function planCard(p, fm, i) {
-  const kp = kpiList(p), rs = respList(p);
+  const kp = kpiList(p), rs = respShow(p);
   return `<article class="frame plan unfold glow-run glow-hover">${corners()}
     <div class="plan-head">
       <div class="plan-no"><small>PLAN</small>${p.strategyNo}.${p.order}</div>
@@ -1166,7 +1286,7 @@ function planCard(p, fm, i) {
     <div class="gantt">
       <div class="g-row hdr"><span></span><div class="months mhead">${MONTHS.map((m, k) => `<span class="mc${k === fm ? ' now' : ''}">${m}</span>`).join('')}</div></div>
       ${p.activities.length ? p.activities.map((a, k) => `
-      <div class="g-row"><div class="a-txt"><i>${k + 1}</i><span>${esc(a.text)}</span></div>
+      <div class="g-row"><div class="a-txt"><i>${k + 1}</i><span>${esc(a.text)}${a.level ? ` <em class="a-lv l${a.level}" title="ระดับความยาก ${a.level} · ${DIFF[a.level].th}${(a.pos || mainPos(p)) ? ' · ' + esc(a.pos || mainPos(p)) : ''}">${a.level}</em>` : ''}</span></div>
         <div class="months" title="${esc(runs(a.months).map(r => MONTHS[r[0]] + (r[1] > r[0] ? '–' + MONTHS[r[1]] : '')).join(', ') || 'ยังไม่กำหนดเดือน')}">
           ${MONTHS.map((m, j) => `<span class="mc${j === fm ? ' now' : ''}" style="grid-column:${j + 1}"></span>`).join('')}
           ${runs(a.months).map(r => `<span class="bar" style="grid-column:${r[0] + 1}/${r[1] + 2};--i:${k}"></span>`).join('')}
@@ -1185,7 +1305,7 @@ function viewTable() {
     body += `<tr class="s-row"><td colspan="${5 + 12}">ยุทธศาสตร์ที่ ${s.no}: ${esc(s.name)}</td></tr>`;
     projectsOf(s.no).forEach(p => {
       const acts = p.activities.length ? p.activities : [{ text: '', months: [] }];
-      const kp = kpiList(p), rs = respList(p), n = acts.length;
+      const kp = kpiList(p), rs = respShow(p), n = acts.length;
       acts.forEach((a, i) => {
         const cells = MONTHS.map((m, j) => {
           const on = !!a.months[j];
@@ -1250,11 +1370,15 @@ function viewSettings() {
       <div class="btn-row"><button class="btn btn-ghost" type="button" data-act="strat-add">${icon('plus')}เพิ่มยุทธศาสตร์</button><button class="btn btn-gold" type="submit">${icon('save')}บันทึก</button></div>
     </form>
 
-    <form class="frame panel unfold glow-run glow-hover" id="fStaff" style="--i:4">${corners()}
+    ${hasPos() ? `<div class="frame panel unfold glow-run glow-hover" style="--i:4">${corners()}
+      <h3>${icon('users')}บุคลากรและตำแหน่งงาน</h3><p class="hint">ผู้รับผิดชอบในแผนงานกำหนดตามตำแหน่งงาน พร้อมคำบรรยายลักษณะงาน ความรับผิดชอบ และระดับความยากง่าย</p>
+      <ul class="pos-mini">${positions().map(x => `<li>${lvBadge(x.level)}<b>${esc(x.name)}</b><span>${esc(holderList(x).join(', ') || 'ยังไม่ระบุผู้ดำรงตำแหน่ง')}</span></li>`).join('')}</ul>
+      <div class="btn-row"><a class="btn btn-gold" href="#jobs">${icon('users')}ไปหน้าวิเคราะห์ตำแหน่งงาน</a></div>
+    </div>` : `<form class="frame panel unfold glow-run glow-hover" id="fStaff" style="--i:4">${corners()}
       <h3>${icon('users')}บุคลากร / ผู้รับผิดชอบ</h3><p class="hint">รายชื่อนี้จะแสดงเป็นตัวเลือกผู้รับผิดชอบในแต่ละแผนงาน</p>
       <div class="list-ed" id="staffList">${(d.staff || []).map(s => staffRow(s)).join('')}</div>
       <div class="btn-row"><button class="btn btn-ghost" type="button" data-act="staff-add">${icon('plus')}เพิ่มบุคลากร</button><button class="btn btn-gold" type="submit">${icon('save')}บันทึก</button></div>
-    </form>
+    </form>`}
   </div>`;
 }
 const stratRow = s => `<div class="le-row"><input class="inp" name="no" inputmode="numeric" value="${esc(s.no || '')}" aria-label="ลำดับ"><textarea class="inp" name="name" rows="2" aria-label="ชื่อยุทธศาสตร์">${esc(s.name || '')}</textarea><button type="button" class="icon-btn del" data-act="row-del" title="ลบ">${icon('trash')}</button></div>`;
@@ -1293,10 +1417,15 @@ function openEditor(p, presetS) {
   const isNew = !p;
   p = p ? JSON.parse(JSON.stringify(p)) : { id: '', fiscalYear: S.year, strategyNo: presetS || (S.filter.s || 1), order: 0, title: '', indicators: '', budget: '', responsible: '', activities: [{ text: '', months: Array(12).fill(false) }] };
   if (isNew) p.order = projectsOf(p.strategyNo).reduce((m, x) => Math.max(m, x.order), 0) + 1;
-  p.activities = p.activities.map(a => ({ id: a.id || '', text: a.text || '', months: MONTHS.map((m, i) => !!(a.months && a.months[i])) }));
-  ED = { p, isNew, resp: respList(p) };
-  const staffNames = (S.data.staff || []).map(s => s.name);
-  const extraResp = ED.resp.filter(r => !staffNames.includes(r));
+  p.activities = p.activities.map(a => ({ id: a.id || '', text: a.text || '', months: MONTHS.map((m, i) => !!(a.months && a.months[i])), pos: a.pos || '', level: Number(a.level) || 0 }));
+  ED = { p, isNew, resp: respList(p), roles: {}, extra: [] };
+  // ตำแหน่ง + บทบาท · แผนงานเดิมที่ยังไม่ระบุตำแหน่ง: จับคู่จากชื่อผู้ดำรงตำแหน่ง (คนแรก = หลัก)
+  const pr = parsePosResp(p.posResp);
+  if (pr.length) pr.forEach(x => { ED.roles[x.name] = x.role; });
+  else ED.resp.forEach(n => { const x = positions().find(y => holderList(y).includes(n)); if (x && !ED.roles[x.name]) ED.roles[x.name] = Object.values(ED.roles).includes('หลัก') ? 'ร่วม' : 'หลัก'; });
+  const allHolders = positions().flatMap(holderList), staffNames = (S.data.staff || []).map(s => s.name);
+  ED.extra = ED.resp.filter(r => !allHolders.includes(r) && (hasPos() || !staffNames.includes(r)));
+  const extraResp = ED.extra;
   const w = openModal(`
     <div class="m-head"><div class="deco">${isNew ? 'NEW PLAN' : 'EDIT PLAN'}</div><h3>${isNew ? 'เพิ่มแผนงาน' : 'แก้ไขแผนงาน'}</h3></div>
     ${divider(true)}
@@ -1308,15 +1437,13 @@ function openEditor(p, presetS) {
       </div>
       <div class="field"><label>เป้าประสงค์ / โครงการ <span style="color:#b23a3a">*</span></label><textarea class="inp" name="title" rows="2" placeholder="เช่น พัฒนาแนวทางเฝ้าระวังและป้องกันการติดเชื้อ…">${esc(p.title)}</textarea><div class="err" id="errTitle" hidden>กรุณาระบุเป้าประสงค์/โครงการ</div></div>
       <div class="field"><label>กิจกรรม และเดือนที่ดำเนินการ (ปีงบประมาณ ต.ค.–ก.ย.)</label><div id="actList"></div>
-        <button type="button" class="btn btn-line btn-sm" data-act="act-add" style="align-self:flex-start">${icon('plus')}เพิ่มกิจกรรม</button></div>
+        <div class="btn-row" style="justify-content:flex-start;margin:0"><button type="button" class="btn btn-line btn-sm" data-act="act-add">${icon('plus')}เพิ่มกิจกรรม</button>${hasPos() ? `<button type="button" class="btn btn-line btn-sm" data-act="act-guess" title="เติมระดับความยากให้กิจกรรมที่ยังไม่ระบุ จากถ้อยคำของกิจกรรม (ตรวจทานก่อนบันทึก)">${icon('spark')}แนะนำระดับความยาก</button>` : ''}</div></div>
       <div class="field"><label>ผลผลิต / ตัวชี้วัด (1 บรรทัด ต่อ 1 ตัวชี้วัด)</label><textarea class="inp" name="indicators" rows="4" placeholder="ร้อยละของการปฏิบัติตามแนวทางการพยาบาล (เป้าหมาย: ≥ 90%)">${esc(p.indicators)}</textarea></div>
-      <div class="row2">
-        <div class="field"><label>งบประมาณ</label><input class="inp" name="budget" list="budgetList" value="${esc(p.budget)}" placeholder="ไม่มี / งบหน่วยงาน / จำนวนเงิน">
-          <datalist id="budgetList"><option value="ไม่มี"><option value="งบหน่วยงาน"><option value="งบประมาณประจำปี"><option value="ตามแผนกลุ่มการพยาบาล"></datalist></div>
-        <div class="field"><label>ผู้รับผิดชอบ</label>
+      <div class="field"><label>งบประมาณ</label><input class="inp" name="budget" list="budgetList" value="${esc(p.budget)}" placeholder="ไม่มี / งบหน่วยงาน / จำนวนเงิน">
+        <datalist id="budgetList"><option value="ไม่มี"><option value="งบหน่วยงาน"><option value="งบประมาณประจำปี"><option value="ตามแผนกลุ่มการพยาบาล"></datalist></div>
+      ${hasPos() ? edRolesHtml() : `<div class="field"><label>ผู้รับผิดชอบ</label>
           <div class="resp-chips">${staffNames.map(n => `<button type="button" class="rchip${ED.resp.includes(n) ? ' on' : ''}" data-act="resp" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
-          <input class="inp" name="respExtra" value="${esc(extraResp.join(', '))}" placeholder="อื่น ๆ (คั่นด้วยเครื่องหมายจุลภาค)"></div>
-      </div>
+          <input class="inp" name="respExtra" value="${esc(extraResp.join(', '))}" placeholder="อื่น ๆ (คั่นด้วยเครื่องหมายจุลภาค)"></div>`}
     </form>
     <div class="m-foot"><button class="btn btn-line" data-act="ed-cancel">ยกเลิก</button><button class="btn btn-navy" data-act="ed-save">${icon('save')}บันทึกลง Google Sheet</button></div>`);
   w.id = 'editor';
@@ -1324,7 +1451,12 @@ function openEditor(p, presetS) {
   setTimeout(() => { const t = $('#edForm [name="title"]'); if (t && isNew) t.focus(); }, 80);
 }
 function readActsFromDom() {
-  document.querySelectorAll('#actList .act-ed').forEach((el, i) => { if (ED.p.activities[i]) ED.p.activities[i].text = el.querySelector('textarea').value; });
+  document.querySelectorAll('#actList .act-ed').forEach((el, i) => {
+    const a = ED.p.activities[i]; if (!a) return;
+    a.text = el.querySelector('textarea').value;
+    const ps = el.querySelector('[data-af=pos]'), lv = el.querySelector('[data-af=level]');
+    if (ps) a.pos = ps.value; if (lv) a.level = Number(lv.value) || 0;
+  });
 }
 function renderActs() {
   const box = $('#actList'); if (!box) return;
@@ -1341,7 +1473,9 @@ function renderActs() {
       </div>
       <div class="mchips">${MONTHS.map((m, j) => `<button type="button" class="mchip${a.months[j] ? ' on' : ''}" data-act="mon" data-j="${j}">${m}</button>`).join('')}</div>
       <div class="mquick"><button type="button" data-act="mon-all">ทั้งปี</button><button type="button" data-act="mon-q">ทุก 3 เดือน</button><button type="button" data-act="mon-clear">ล้าง</button></div>
+      ${actMetaHtml(a, i)}
     </div>`).join('');
+  hydrateIcons(box); edCheck();
 }
 async function saveEditor(btn) {
   readActsFromDom();
@@ -1350,12 +1484,20 @@ async function saveEditor(btn) {
   $('#errTitle').hidden = !!title;
   if (!title) { fv(f, 'title').focus(); return; }
   const extra = fv(f, 'respExtra').value.split(/\s*[,，、]\s*/).map(s => s.trim()).filter(Boolean);
-  const uniq = [...new Set([...ED.resp.filter(r => (S.data.staff || []).some(s => s.name === r)), ...extra])];
+  let uniq, posResp = '';
+  if (hasPos()) {
+    const pr = Object.entries(ED.roles).filter(([n, r]) => r && posByName(n)).map(([name, role]) => ({ name, role }));
+    posResp = fmtPosResp(pr);
+    // ช่องผู้รับผิดชอบเดิม (รายชื่อ) = ผู้ดำรงตำแหน่งที่ได้รับมอบหมาย + ผู้เกี่ยวข้องอื่น
+    uniq = [...new Set([...ROLES.flatMap(r => pr.filter(x => x.role === r).flatMap(x => holderList(posByName(x.name)))), ...extra])];
+    const mains = pr.filter(x => x.role === 'หลัก').length;
+    if (mains !== 1 && !(await confirmBox(mains ? 'มีผู้รับผิดชอบหลักมากกว่า 1 ตำแหน่ง' : 'ยังไม่ได้เลือกผู้รับผิดชอบหลัก', '<p style="margin:0">ผู้เยี่ยมสำรวจจะดูว่าแผนงานแต่ละแผนมีผู้รับผิดชอบหลักชัดเจน 1 ตำแหน่ง ต้องการบันทึกต่อหรือไม่</p>', 'บันทึกต่อ'))) return;
+  } else uniq = [...new Set([...ED.resp.filter(r => (S.data.staff || []).some(s => s.name === r)), ...extra])];
   const p = {
     id: ED.p.id, fiscalYear: fv(f, 'fiscalYear').value, strategyNo: Number(fv(f, 'strategyNo').value), order: Number(fv(f, 'order').value) || 1,
     title, indicators: fv(f, 'indicators').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).join('\n'),
-    budget: fv(f, 'budget').value.trim(), responsible: uniq.join(', '),
-    activities: ED.p.activities.filter(a => a.text.trim()).map(a => ({ id: a.id, text: a.text.trim(), months: a.months }))
+    budget: fv(f, 'budget').value.trim(), responsible: uniq.join(', '), posResp,
+    activities: ED.p.activities.filter(a => a.text.trim()).map(a => ({ id: a.id, text: a.text.trim(), months: a.months, pos: a.pos || '', level: a.level || 0 }))
   };
   const w = $('#editor');
   w.dataset.busy = '1';
@@ -1411,6 +1553,301 @@ async function saveForm(kind, form) {
   }
 }
 
+/* ---------------- การวิเคราะห์ตำแหน่งงาน (Job Analysis) ----------------
+   บรรยายและวิเคราะห์ลักษณะหน้าที่ ความรับผิดชอบ และระดับความยากง่ายของตำแหน่งงาน
+   แล้วเชื่อมกับแผนปฏิบัติงาน: แผนงาน → ตำแหน่ง + บทบาท · กิจกรรม → ตำแหน่งผู้ดำเนินการ + ระดับความยาก */
+const LEVELS = ['ปฏิบัติการ', 'ชำนาญการ', 'ชำนาญการพิเศษ'];
+const lvRank = lv => LEVELS.indexOf(lv) + 1;   // 1–3 (0 = ยังไม่ระบุ)
+const DIFF = {
+  1: { th: 'พื้นฐาน', d: 'ปฏิบัติตามแนวทางหรือขั้นตอนที่กำหนดไว้ชัดเจน ภายใต้การกำกับ แนะนำ และตรวจสอบ', fit: 'ระดับปฏิบัติการขึ้นไป' },
+  2: { th: 'ยุ่งยาก', d: 'ใช้ประสบการณ์และความชำนาญ ตัดสินใจแก้ปัญหา สอนงาน นิเทศ ติดตามและประเมินผล', fit: 'ระดับชำนาญการขึ้นไป' },
+  3: { th: 'ยุ่งยากซับซ้อนมาก', d: 'พัฒนาระบบ กำหนดแนวทางปฏิบัติ วิเคราะห์ วิจัย และบริหารความเสี่ยงระดับหน่วยงาน', fit: 'ระดับชำนาญการพิเศษ' }
+};
+const ROLES = ['หลัก', 'ร่วม', 'กำกับติดตาม'];
+const ROLE_TH = { 'หลัก': 'ผู้รับผิดชอบหลัก', 'ร่วม': 'ผู้ร่วมดำเนินการ', 'กำกับติดตาม': 'ผู้กำกับติดตาม' };
+const ROLE_KEY = { 'หลัก': 'main', 'ร่วม': 'co', 'กำกับติดตาม': 'sup' };
+const DUTIES = [['dutyOps', 'ด้านการปฏิบัติการ'], ['dutyPlan', 'ด้านการวางแผน'], ['dutyCoord', 'ด้านการประสานงาน'], ['dutyService', 'ด้านการบริการ']];
+const hasPos = () => !!(S.data && Array.isArray(S.data.positions));
+const positions = () => (S.data && S.data.positions) || [];
+const posByName = n => positions().find(x => x.name === n);
+const lines = t => String(t || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+const holderList = pos => String((pos && pos.holders) || '').split(/\s*[,，、\n]\s*/).map(s => s.trim()).filter(Boolean);
+const lvBadge = lv => `<span class="lv lv${lvRank(lv)}">${esc(lv || 'ยังไม่ระบุระดับ')}</span>`;
+const diffBadge = n => n ? `<span class="df df${n}" title="${esc(DIFF[n].d)}">ระดับ ${n} · ${DIFF[n].th}</span>` : '<span class="df df0">ยังไม่ระบุระดับ</span>';
+
+// ช่อง "ตำแหน่งที่รับผิดชอบ" ในชีต: 1 บรรทัดต่อ 1 ตำแหน่ง รูปแบบ "ชื่อตำแหน่ง (บทบาท)"
+function parsePosResp(str) {
+  return String(str || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+    const m = l.match(/^(.*?)\s*\((หลัก|ร่วม|กำกับติดตาม)\)\s*$/);
+    return m ? { name: m[1].trim(), role: m[2] } : { name: l, role: 'ร่วม' };
+  });
+}
+const fmtPosResp = list => ROLES.flatMap(r => list.filter(x => x.role === r).map(x => `${x.name} (${r})`)).join('\n');
+const mainPos = p => (parsePosResp(p.posResp).find(x => x.role === 'หลัก') || {}).name || '';
+// ผู้รับผิดชอบสำหรับแสดงผล: ตำแหน่ง (บทบาท) · ถ้ายังไม่ระบุตำแหน่งใช้รายชื่อเดิม
+function respShow(p) {
+  const pr = parsePosResp(p.posResp);
+  return pr.length ? ROLES.flatMap(r => pr.filter(x => x.role === r).map(x => `${x.name} (${r})`)) : respList(p);
+}
+// แนะนำระดับความยากจากถ้อยคำของกิจกรรม (เป็นร่าง ต้องตรวจทาน)
+function guessLevel(text) {
+  const t = String(text || '');
+  if (/พัฒนา(แนว|ระบบ|นวัตกรรม|รูปแบบ|โปรแกรม|คู่มือ)|วิเคราะห์|วิจัย|จัดทำ(แนว|แผน|คู่มือ|มาตรฐาน|ระบบ)|ออกแบบ|กำหนด(แนว|นโยบาย|มาตรฐาน|เกณฑ์)|ปรับปรุงแนว|ค้นหา\s*ปัญหา|ทบทวน/.test(t)) return 3;
+  if (/ประเมิน|ติดตาม|นิเทศ|สอน|ฝึกซ้อม|ซ้อมแผน|ฝึกทักษะ|สรุปผล|ทดลองใช้|ศึกษา|ประสาน|ให้ความรู้|วิทยากร|รวบรวม|ตรวจสอบคุณภาพ/.test(t)) return 2;
+  return 1;
+}
+
+// ภาระงานและข้อสังเกตของปีงบประมาณที่เลือก
+function jobLoad() {
+  const L = {}, issues = [];
+  positions().forEach(x => { L[x.name] = { main: 0, co: 0, sup: 0, acts: 0, lv: [0, 0, 0, 0], months: 0 }; });
+  let noLevel = 0, nActs = 0, assigned = 0;
+  const ps = strategies().flatMap(s => projectsOf(s.no));
+  ps.forEach(p => {
+    const pr = parsePosResp(p.posResp), mains = pr.filter(x => x.role === 'หลัก'), tag = `${p.strategyNo}.${p.order}`;
+    if (pr.length) assigned++;
+    if (!pr.length) issues.push(['warn', `แผนงาน ${tag} ยังไม่ระบุตำแหน่งผู้รับผิดชอบ`, p.id]);
+    else if (!mains.length) issues.push(['warn', `แผนงาน ${tag} ยังไม่มีผู้รับผิดชอบหลัก`, p.id]);
+    else if (mains.length > 1) issues.push(['info', `แผนงาน ${tag} มีผู้รับผิดชอบหลัก ${mains.length} ตำแหน่ง — ควรมีผู้รับผิดชอบหลักเพียง 1 ตำแหน่ง`, p.id]);
+    pr.forEach(x => {
+      if (!L[x.name]) issues.push(['bad', `แผนงาน ${tag} อ้างถึงตำแหน่ง "${x.name}" ซึ่งไม่มีในรายการตำแหน่งงาน`, p.id]);
+      else L[x.name][ROLE_KEY[x.role]]++;
+    });
+    const mp = mains[0] ? mains[0].name : '';
+    p.activities.forEach((a, i) => {
+      nActs++;
+      if (!a.level) noLevel++;
+      const who = a.pos || mp, pos = posByName(who);
+      if (a.pos && !pos) issues.push(['bad', `กิจกรรม ${tag}.${i + 1} อ้างถึงตำแหน่ง "${a.pos}" ซึ่งไม่มีในรายการตำแหน่งงาน`, p.id]);
+      if (!pos) return;
+      const o = L[who]; o.acts++; o.lv[a.level || 0]++; o.months += a.months.filter(Boolean).length;
+      if (a.level && lvRank(pos.level) && a.level > lvRank(pos.level)) issues.push(['bad', `กิจกรรม ${tag}.${i + 1} เป็นงานระดับ ${a.level} (${DIFF[a.level].th}) แต่มอบหมายให้${pos.name} (ระดับ${pos.level}) — ควรมอบหมายตำแหน่งที่สูงกว่า หรือให้ตำแหน่งที่สูงกว่ากำกับติดตาม`, p.id]);
+    });
+  });
+  if (noLevel) issues.push(['info', `กิจกรรม ${noLevel} จาก ${nActs} รายการ ยังไม่ระบุระดับความยาก (กดแก้ไขแผนงาน → "แนะนำระดับความยาก")`]);
+  positions().forEach(x => {
+    const o = L[x.name];
+    if (lvRank(x.level) === 3 && o.lv[1] >= 3) issues.push(['info', `${x.name} ดำเนินกิจกรรมระดับพื้นฐานเอง ${o.lv[1]} รายการ — พิจารณามอบหมายให้ระดับปฏิบัติการ เพื่อกระจายภาระงานและพัฒนาบุคลากร`]);
+    if (!o.main && !o.co && !o.sup && !o.acts) issues.push(['info', `${x.name} ยังไม่มีบทบาทในแผนปฏิบัติงานปีงบประมาณ ${S.year}`]);
+    if (!holderList(x).length) issues.push(['info', `${x.name} ยังไม่ระบุผู้ดำรงตำแหน่ง`]);
+  });
+  return { L, issues, ps, noLevel, nActs, assigned };
+}
+
+function viewJobs() {
+  const head = `<section class="page-head reveal"><div class="kicker">JOB ANALYSIS</div><h2 class="gold-text">วิเคราะห์ตำแหน่งงาน</h2>
+    <p>บรรยายและวิเคราะห์ลักษณะหน้าที่ ความรับผิดชอบ และระดับความยากง่ายของตำแหน่งงานอย่างเป็นระบบ เชื่อมกับแผนปฏิบัติงาน ปีงบประมาณ ${esc(S.year || '')}</p>${divider()}</section>`;
+  if (!hasPos()) return head + `<div class="frame panel reveal" style="max-width:760px;margin:0 auto">${corners()}<h3>${icon('alert')}ต้องอัปเดต Code.gs ก่อน</h3>
+    <p class="hint">วาง Code.gs ฉบับใหม่ใน Apps Script แล้วกด Deploy → จัดการการทำให้ใช้งานได้ → แก้ไข → เวอร์ชันใหม่ ระบบจะสร้างชีต "ตำแหน่งงาน" พร้อมร่างคำบรรยายลักษณะงานให้</p>
+    <div class="btn-row"><button class="btn btn-gold" data-act="sync">${icon('sync')}ซิงก์อีกครั้ง</button></div></div>`;
+  const J = jobLoad(), ps = positions();
+  const bad = J.issues.filter(x => x[0] === 'bad').length, warn = J.issues.filter(x => x[0] === 'warn').length;
+  const lvDone = J.nActs - J.noLevel;
+  return head + `
+  <div class="doc-actions reveal"><button class="btn btn-gold" data-act="pos-add">${icon('plus')}เพิ่มตำแหน่ง</button><button class="btn btn-ghost" data-act="jobs-print">${icon('pdf')}พิมพ์ / บันทึก PDF</button><a class="btn btn-ghost" href="#plans">${icon('edit')}กำหนดตำแหน่งในแผนงาน</a></div>
+  <section class="jd-stats reveal">
+    <div class="frame jd-stat">${corners()}<small>ตำแหน่งงาน</small><b>${ps.length}</b><span>ตำแหน่ง · ${ps.reduce((s, x) => s + (Number(x.count) || 1), 0)} อัตรา</span></div>
+    <div class="frame jd-stat">${corners()}<small>แผนงานที่ระบุตำแหน่งแล้ว</small><b>${J.assigned}<i>/${J.ps.length}</i></b><span>${J.ps.length ? Math.round(J.assigned / J.ps.length * 100) : 0}%</span></div>
+    <div class="frame jd-stat">${corners()}<small>กิจกรรมที่ระบุระดับความยาก</small><b>${lvDone}<i>/${J.nActs}</i></b><span>${J.nActs ? Math.round(lvDone / J.nActs * 100) : 0}%</span></div>
+    <div class="frame jd-stat ${bad ? 'bad' : warn ? 'warn' : 'ok'}">${corners()}<small>ข้อสังเกตที่ต้องแก้</small><b>${bad + warn}</b><span>${bad ? `ระดับงานไม่เหมาะกับตำแหน่ง ${bad}` : warn ? 'ยังระบุไม่ครบ' : 'ครบถ้วน'}</span></div>
+  </section>
+
+  <div class="sec-title reveal"><span class="badge">DIFFICULTY</span><h3>เกณฑ์ระดับความยากง่ายของงาน</h3></div>
+  <section class="df-grid reveal">${[1, 2, 3].map(n => `<div class="frame df-card d${n}">${corners()}<div class="df-n">${n}</div><div><b>${DIFF[n].th}</b><p>${esc(DIFF[n].d)}</p><small>เหมาะกับ${DIFF[n].fit}</small></div></div>`).join('')}</section>
+
+  <div class="sec-title reveal"><span class="badge">JOB DESCRIPTION</span><h3>คำบรรยายลักษณะงานรายตำแหน่ง</h3><span class="sec-count">${ps.length} ตำแหน่ง</span></div>
+  <section class="jd-grid">${ps.length ? ps.map((x, i) => jdCard(x, J.L[x.name], i)).join('') : `<div class="frame panel empty">${corners()}ยังไม่มีตำแหน่งงาน — กด "เพิ่มตำแหน่ง"</div>`}</section>
+
+  <div class="sec-title reveal"><span class="badge">ASSIGNMENT</span><h3>การมอบหมายงานตามแผนปฏิบัติงาน จำแนกตามตำแหน่ง</h3></div>
+  <div class="paper reveal">${corners(true)}${matrixHtml(J)}</div>
+
+  <div class="sec-title reveal" style="margin-top:22px"><span class="badge">FINDINGS</span><h3>ข้อสังเกตจากระบบ</h3><span class="sec-count">${J.issues.length} ข้อ</span></div>
+  <div class="frame panel reveal">${corners()}${J.issues.length ? `<ul class="findings">${J.issues.map(x => `<li class="${x[0]}">${icon(x[0] === 'info' ? 'spark' : 'alert')}<span>${esc(x[1])}</span>${x[2] ? `<button class="btn btn-ghost btn-sm" data-act="edit" data-id="${esc(x[2])}">${icon('edit')}แก้ไข</button>` : ''}</li>`).join('')}</ul>` : `<p class="hint" style="margin:0">${icon('check')} การมอบหมายงานครบถ้วนและเหมาะสมกับระดับตำแหน่ง</p>`}</div>`;
+}
+
+function jdCard(x, o, i) {
+  const hs = holderList(x), r = lvRank(x.level);
+  const list = t => lines(t).length ? `<ul>${lines(t).map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : '<p class="z">— ยังไม่ระบุ —</p>';
+  return `<article class="frame jd unfold glow-hover" style="--i:${i}">${corners()}
+    <div class="jd-head">
+      <div class="jd-t">${lvBadge(x.level)}<h4>${esc(x.name)}</h4>
+        <small>${hs.length ? 'ผู้ดำรงตำแหน่ง: ' + esc(hs.join(', ')) : 'ยังไม่ระบุผู้ดำรงตำแหน่ง'} · ${Number(x.count) || 1} อัตรา${x.reportsTo ? ' · รายงานต่อ ' + esc(x.reportsTo) : ''}</small></div>
+      <div class="plan-actions"><button class="icon-btn" data-act="pos-edit" data-id="${esc(x.id)}" title="แก้ไข" aria-label="แก้ไข">${icon('edit')}</button><button class="icon-btn del" data-act="pos-del" data-id="${esc(x.id)}" title="ลบ" aria-label="ลบ">${icon('trash')}</button></div>
+    </div>
+    ${x.purpose ? `<p class="jd-purpose">${esc(x.purpose)}</p>` : ''}
+    <div class="sub-h">DUTIES <b>ลักษณะหน้าที่</b></div>
+    <div class="jd-duties">${DUTIES.map(([k, t]) => `<div><h5>${t}</h5>${list(x[k])}</div>`).join('')}</div>
+    <div class="sub-h">RESPONSIBILITY <b>ความรับผิดชอบหลัก</b></div><p class="jd-p">${esc(x.responsibility || '— ยังไม่ระบุ —')}</p>
+    <div class="sub-h">DIFFICULTY <b>ระดับความยากง่ายของงาน</b></div>
+    <div class="jd-meter" title="ระดับ ${r} จาก 3">${[1, 2, 3].map(n => `<i class="${n <= r ? 'on' : ''}"></i>`).join('')}<span>${r ? DIFF[r].th : 'ยังไม่ระบุระดับ'}</span></div>
+    <p class="jd-p">${esc(x.difficulty || '— ยังไม่ระบุ —')}</p>
+    <div class="sub-h">SPECIFICATION <b>คุณสมบัติและสมรรถนะที่ต้องการ</b></div>${list(x.competency)}
+    <div class="sub-h">INDICATORS <b>ตัวชี้วัดของตำแหน่ง</b></div>${list(x.kpi)}
+    <div class="jd-load">
+      <span><b>${o ? o.main : 0}</b>รับผิดชอบหลัก</span><span><b>${o ? o.co : 0}</b>ร่วมดำเนินการ</span><span><b>${o ? o.sup : 0}</b>กำกับติดตาม</span>
+      <span><b>${o ? o.acts : 0}</b>กิจกรรม${o && o.acts ? ` <em>(ระดับ 1: ${o.lv[1]} · 2: ${o.lv[2]} · 3: ${o.lv[3]}${o.lv[0] ? ` · ไม่ระบุ ${o.lv[0]}` : ''})</em>` : ''}</span>
+    </div>
+  </article>`;
+}
+
+// ตาราง แผนงาน × ตำแหน่ง (ใช้ทั้งบนจอและตอนพิมพ์)
+function matrixHtml(J) {
+  const ps = positions(), st = settings();
+  if (!ps.length) return '<p class="z">ยังไม่มีตำแหน่งงาน</p>';
+  const roleCell = (p, x) => {
+    const pr = parsePosResp(p.posResp), mine = pr.find(y => y.name === x.name), mp = (pr.find(y => y.role === 'หลัก') || {}).name;
+    const acts = p.activities.map((a, i) => ({ a, i })).filter(({ a }) => (a.pos || mp) === x.name);
+    if (!mine && !acts.length) return '<td class="mx-c"></td>';
+    const over = acts.filter(({ a }) => a.level && lvRank(x.level) && a.level > lvRank(x.level));
+    return `<td class="mx-c${mine ? ' r-' + ROLE_KEY[mine.role] : ''}${over.length ? ' over' : ''}">${mine ? `<span class="role r-${ROLE_KEY[mine.role]}">${mine.role}</span>` : ''}
+      ${acts.length ? `<small>กิจกรรม ${acts.map(({ a, i }) => `${i + 1}${a.level ? `<sup>${a.level}</sup>` : ''}`).join(', ')}</small>` : ''}</td>`;
+  };
+  const body = strategies().map(s => {
+    const rows = projectsOf(s.no);
+    if (!rows.length) return '';
+    return `<tr class="s-row"><td colspan="${ps.length + 2}">ยุทธศาสตร์ที่ ${s.no}: ${esc(s.name)}</td></tr>` + rows.map(p => {
+      const mx = Math.max(0, ...p.activities.map(a => a.level || 0));
+      return `<tr><td class="mx-p">${p.strategyNo}.${p.order} ${esc(p.title)}</td>${ps.map(x => roleCell(p, x)).join('')}<td class="mx-d">${mx ? diffBadge(mx) : '<span class="z">–</span>'}</td></tr>`;
+    }).join('');
+  }).join('');
+  const L = J.L;
+  return `<div class="doc-title"><h3>การมอบหมายงานตามแผนปฏิบัติงาน จำแนกตามตำแหน่งงาน</h3><p>${esc(st.unitName || '')} ปีงบประมาณ ${esc(S.year || '')} &nbsp;${esc(st.orgLine || '')}</p></div>
+  <div class="doc-scroll"><table class="doc mx">
+    <thead><tr><th>แผนงาน</th>${ps.map(x => `<th>${esc(x.name)}<small>${esc(x.level || '')}</small></th>`).join('')}<th>ระดับงานสูงสุด</th></tr></thead>
+    <tbody>${body || `<tr><td colspan="${ps.length + 2}" class="z">ยังไม่มีแผนงานในปีงบประมาณนี้</td></tr>`}</tbody>
+    <tfoot>
+      <tr><th>รับผิดชอบหลัก / ร่วม / กำกับ</th>${ps.map(x => `<td>${L[x.name].main} / ${L[x.name].co} / ${L[x.name].sup}</td>`).join('')}<td></td></tr>
+      <tr><th>กิจกรรมที่ดำเนินการ (ระดับ 1 · 2 · 3)</th>${ps.map(x => `<td>${L[x.name].acts} <small>(${L[x.name].lv[1]} · ${L[x.name].lv[2]} · ${L[x.name].lv[3]})</small></td>`).join('')}<td></td></tr>
+      <tr><th>ภาระงาน (กิจกรรม × เดือน)</th>${ps.map(x => `<td>${L[x.name].months}</td>`).join('')}<td></td></tr>
+    </tfoot>
+  </table></div>
+  <p class="mx-note">หลัก = ผู้รับผิดชอบหลัก · ร่วม = ผู้ร่วมดำเนินการ · กำกับ = ผู้กำกับติดตาม · ตัวเลขยก = ระดับความยากของกิจกรรม · ช่องสีแดง = ระดับงานสูงกว่าระดับตำแหน่ง · กิจกรรมที่ไม่ระบุผู้ดำเนินการ นับให้ผู้รับผิดชอบหลัก</p>`;
+}
+
+/* ---------- แก้ไขตำแหน่ง ---------- */
+function openPosEditor(x) {
+  const isNew = !x;
+  x = x ? { ...x } : { id: '', name: '', level: 'ปฏิบัติการ', holders: '', count: 1, reportsTo: settings().headPosition || '', purpose: '', dutyOps: '', dutyPlan: '', dutyCoord: '', dutyService: '', responsibility: '', difficulty: '', competency: '', kpi: '' };
+  const ta = (k, label, rows, ph) => `<div class="field"><label>${label}</label><textarea class="inp" name="${k}" rows="${rows}" placeholder="${ph || '1 บรรทัด ต่อ 1 ข้อ'}">${esc(x[k] || '')}</textarea></div>`;
+  const w = openModal(`<div class="m-head"><div class="deco">${isNew ? 'NEW POSITION' : 'JOB DESCRIPTION'}</div><h3>${isNew ? 'เพิ่มตำแหน่งงาน' : 'แก้ไขคำบรรยายลักษณะงาน'}</h3></div>${divider(true)}
+    <form class="m-body" id="posForm" autocomplete="off">
+      <div class="ed-grid pos2">
+        <div class="field"><label>ชื่อตำแหน่ง <span style="color:#b23a3a">*</span></label><input class="inp" name="name" value="${esc(x.name)}" placeholder="เช่น พยาบาลวิชาชีพชำนาญการ"></div>
+        <div class="field"><label>ระดับตำแหน่ง</label><select class="inp" name="level">${LEVELS.map(l => `<option${l === x.level ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+      </div>
+      <div class="ed-grid pos2">
+        <div class="field"><label>ผู้ดำรงตำแหน่ง (คั่นด้วยจุลภาค)</label><input class="inp" name="holders" value="${esc(x.holders)}"></div>
+        <div class="field"><label>จำนวนอัตรา</label><input class="inp" name="count" type="number" min="1" value="${Number(x.count) || 1}"></div>
+      </div>
+      <div class="field"><label>รายงานต่อ (ผู้บังคับบัญชา)</label><input class="inp" name="reportsTo" value="${esc(x.reportsTo)}"></div>
+      ${ta('purpose', 'วัตถุประสงค์ของตำแหน่ง', 2, 'ตำแหน่งนี้มีไว้เพื่ออะไร')}
+      <div class="sub-h" style="margin-top:6px">DUTIES <b>ลักษณะหน้าที่ (1 บรรทัด ต่อ 1 ข้อ)</b></div>
+      <div class="row2">${DUTIES.map(([k, t]) => ta(k, t, 4)).join('')}</div>
+      ${ta('responsibility', 'ความรับผิดชอบหลัก (ผลลัพธ์ที่ตำแหน่งนี้ต้องรับผิดชอบ)', 2, '')}
+      ${ta('difficulty', 'ระดับความยากง่ายของงาน (บรรยาย)', 2, 'เช่น งานยุ่งยาก ต้องใช้ความชำนาญ ตัดสินใจแก้ปัญหาทางคลินิกได้ด้วยตนเอง')}
+      <div class="row2">${ta('competency', 'คุณสมบัติและสมรรถนะที่ต้องการ', 4)}${ta('kpi', 'ตัวชี้วัดของตำแหน่ง', 4)}</div>
+      <div class="err" id="posErr" hidden></div>
+    </form>
+    <div class="m-foot"><button class="btn btn-line" data-r="0">ยกเลิก</button><button class="btn btn-navy" data-r="1">${icon('save')}บันทึกลง Google Sheet</button></div>`);
+  w.addEventListener('click', async e => {
+    const b = e.target.closest('[data-r]'); if (!b) return;
+    if (b.dataset.r === '0') { closeModal(w); return; }
+    const f = $('#posForm'), o = { ...x };
+    ['name', 'level', 'holders', 'count', 'reportsTo', 'purpose', 'dutyOps', 'dutyPlan', 'dutyCoord', 'dutyService', 'responsibility', 'difficulty', 'competency', 'kpi'].forEach(k => { o[k] = fv(f, k).value.trim(); });
+    const err = $('#posErr'); err.hidden = true;
+    if (!o.name) { err.textContent = 'กรุณาระบุชื่อตำแหน่ง'; err.hidden = false; fv(f, 'name').focus(); return; }
+    if (positions().some(y => y.name === o.name && y.id !== o.id)) { err.textContent = 'มีตำแหน่งชื่อนี้อยู่แล้ว'; err.hidden = false; return; }
+    const list = isNew ? [...positions(), o] : positions().map(y => y.id === o.id ? o : y);
+    w.dataset.busy = '1'; const old = b.innerHTML; b.disabled = true; b.innerHTML = '<span class="spinner"></span>กำลังบันทึก…';
+    try {
+      await savePositions(list);
+      delete w.dataset.busy; closeModal(w);
+      toast(isNew ? 'เพิ่มตำแหน่งงานแล้ว' : (x.name !== o.name ? `บันทึกแล้ว · เปลี่ยนชื่อตำแหน่งในแผนงานให้ด้วย` : 'บันทึกคำบรรยายลักษณะงานแล้ว'));
+    } catch (x2) { delete w.dataset.busy; b.disabled = false; b.innerHTML = old; err.textContent = x2.message; err.hidden = false; }
+  });
+}
+async function savePositions(list) {
+  setConn('busy', 'กำลังบันทึก…');
+  try {
+    applyData(await api('savePositions', { list })); S.online = true; S.error = '';
+    setConn('ok', 'เชื่อมต่อ Google Sheet แล้ว'); S._quiet = true; render();
+  } catch (e) {
+    setConn(S.online ? 'ok' : 'bad', S.online ? 'เชื่อมต่อ Google Sheet แล้ว' : 'บันทึกไม่สำเร็จ');
+    throw new Error(/ไม่รู้จักคำสั่ง/.test(e.message) ? 'ต้องอัปเดต Code.gs ใน Apps Script เป็นเวอร์ชันใหม่ก่อน แล้ว Deploy เวอร์ชันใหม่' : e.message);
+  }
+}
+async function deletePosition(id) {
+  const x = positions().find(y => y.id === id); if (!x) return;
+  const J = jobLoad(), o = J.L[x.name], used = o.main + o.co + o.sup + o.acts;
+  const ok = await confirmBox('ลบตำแหน่งนี้?', `<p style="margin:0 0 6px"><b>${esc(x.name)}</b></p>${used ? `<p style="margin:0;color:#b23a3a">ตำแหน่งนี้ยังถูกใช้ในแผนงาน ${o.main + o.co + o.sup} แผน และกิจกรรม ${o.acts} รายการ หลังลบจะขึ้นเป็นข้อสังเกตให้แก้ไข</p>` : ''}`, 'ลบ', true);
+  if (!ok) return;
+  try { await savePositions(positions().filter(y => y.id !== id)); toast('ลบตำแหน่งแล้ว'); } catch (e) { toast(e.message, 'bad'); }
+}
+
+/* ---------- ส่วนผู้รับผิดชอบในหน้าต่างแก้ไขแผนงาน ---------- */
+function edRolesHtml() {
+  if (!hasPos()) return `<div class="field"><label>ผู้รับผิดชอบ</label><p class="hint" style="margin:0">ต้องอัปเดต Code.gs เป็นเวอร์ชันใหม่ก่อน จึงจะกำหนดผู้รับผิดชอบตามตำแหน่งงานได้</p></div>`;
+  return `<div class="field"><label>ผู้รับผิดชอบตามตำแหน่งงาน <small class="lbl-note">เลือกบทบาทของแต่ละตำแหน่ง · ผู้รับผิดชอบหลักควรมี 1 ตำแหน่ง</small></label>
+    <div class="pos-roles">${positions().map(x => {
+      const cur = ED.roles[x.name] || '';
+      return `<div class="pr-row"><div class="pr-name">${lvBadge(x.level)}<b>${esc(x.name)}</b><small>${esc(holderList(x).join(', '))}</small></div>
+        <div class="seg" data-pos="${esc(x.name)}">${['', ...ROLES].map(r => `<button type="button" class="${cur === r ? 'on' : ''}" data-act="role" data-r="${r}">${r ? (r === 'กำกับติดตาม' ? 'กำกับ' : r) : '—'}</button>`).join('')}</div></div>`;
+    }).join('') || '<p class="hint" style="margin:0">ยังไม่มีตำแหน่งงาน — เพิ่มได้ที่หน้า "วิเคราะห์ตำแหน่งงาน"</p>'}</div>
+    <div class="err" id="roleWarn" hidden></div>
+    <input class="inp" name="respExtra" value="${esc(ED.extra.join(', '))}" placeholder="ผู้เกี่ยวข้องอื่น เช่น งาน IC (คั่นด้วยจุลภาค)">
+    ${(() => { const un = ED.extra.filter(n => (S.data.staff || []).some(x => x.name === n)); return un.length ? `<p class="lbl-note" style="margin:4px 0 0">${esc(un.join(', '))} ยังไม่ได้ระบุเป็นผู้ดำรงตำแหน่งใด — เพิ่มชื่อได้ที่หน้า "วิเคราะห์ตำแหน่งงาน" แล้วเลือกบทบาทของตำแหน่งนั้นแทน</p>` : ''; })()}</div>`;
+}
+const edMain = () => (Object.entries(ED.roles).find(([, r]) => r === 'หลัก') || [])[0] || '';
+function actMetaHtml(a, i) {
+  if (!hasPos()) return '';
+  return `<div class="act-meta">
+    <label>ผู้ดำเนินการ<select class="inp" data-af="pos">${[['', 'ตามผู้รับผิดชอบหลัก'], ...positions().map(x => [x.name, x.name])].map(([v, t]) => `<option value="${esc(v)}"${(a.pos || '') === v ? ' selected' : ''}>${esc(t)}</option>`).join('')}${a.pos && !posByName(a.pos) ? `<option value="${esc(a.pos)}" selected>${esc(a.pos)} (ไม่มีในรายการ)</option>` : ''}</select></label>
+    <label>ระดับความยาก<select class="inp" data-af="level"><option value="0">— ยังไม่ระบุ</option>${[1, 2, 3].map(n => `<option value="${n}"${a.level === n ? ' selected' : ''}>${n} · ${DIFF[n].th}</option>`).join('')}</select></label>
+    <span class="act-warn" id="aw${i}"></span></div>`;
+}
+// ตรวจความเหมาะสมระหว่างระดับงานกับระดับตำแหน่ง ขณะแก้ไข
+function edCheck() {
+  if (!ED || !hasPos()) return;
+  const mp = edMain();
+  ED.p.activities.forEach((a, i) => {
+    const el = $('#aw' + i); if (!el) return;
+    const who = a.pos || mp, pos = posByName(who);
+    let msg = '';
+    if (a.level && pos && lvRank(pos.level) && a.level > lvRank(pos.level)) msg = `${icon('alert')}งานระดับ ${a.level} สูงกว่าระดับ${pos.level}`;
+    else if (a.level && !who) msg = `${icon('alert')}ยังไม่มีผู้รับผิดชอบหลัก`;
+    el.innerHTML = msg; el.classList.toggle('on', !!msg);
+  });
+  const mains = Object.values(ED.roles).filter(r => r === 'หลัก').length, w = $('#roleWarn');
+  if (w) { w.hidden = mains === 1; w.textContent = !mains ? 'ยังไม่ได้เลือกผู้รับผิดชอบหลัก' : `เลือกผู้รับผิดชอบหลัก ${mains} ตำแหน่ง — ควรมีเพียง 1 ตำแหน่ง`; }
+}
+
+/* ---------- พิมพ์ / บันทึก PDF ---------- */
+function printJobs() {
+  const st = settings(), J = jobLoad(), ps = positions();
+  const list = t => lines(t).length ? `<ol>${lines(t).map(l => `<li>${esc(l)}</li>`).join('')}</ol>` : '–';
+  const jd = x => `<section class="pj-page"><div class="pj-h"><h2>แบบบรรยายลักษณะงาน (Job Description)</h2><p>${esc(st.unitName || '')} ${esc(st.orgLine || '')}</p></div>
+    <table class="pj"><tbody>
+      <tr><th>ชื่อตำแหน่ง</th><td>${esc(x.name)}</td><th>ระดับตำแหน่ง</th><td>${esc(x.level || '')}</td></tr>
+      <tr><th>ผู้ดำรงตำแหน่ง</th><td>${esc(holderList(x).join(', ') || '–')}</td><th>จำนวนอัตรา</th><td>${Number(x.count) || 1}</td></tr>
+      <tr><th>รายงานต่อ</th><td colspan="3">${esc(x.reportsTo || '–')}</td></tr>
+      <tr><th>วัตถุประสงค์ของตำแหน่ง</th><td colspan="3">${esc(x.purpose || '–')}</td></tr>
+      <tr><th>ลักษณะหน้าที่</th><td colspan="3">${DUTIES.map(([k, t]) => `<b>${t}</b>${list(x[k])}`).join('')}</td></tr>
+      <tr><th>ความรับผิดชอบหลัก</th><td colspan="3">${esc(x.responsibility || '–')}</td></tr>
+      <tr><th>ระดับความยากง่ายของงาน</th><td colspan="3">ระดับ ${lvRank(x.level) || '–'} ${lvRank(x.level) ? '(' + DIFF[lvRank(x.level)].th + ')' : ''} · ${esc(x.difficulty || '')}</td></tr>
+      <tr><th>คุณสมบัติและสมรรถนะที่ต้องการ</th><td colspan="3">${list(x.competency)}</td></tr>
+      <tr><th>ตัวชี้วัดของตำแหน่ง</th><td colspan="3">${list(x.kpi)}</td></tr>
+      <tr><th>บทบาทในแผนปฏิบัติงาน ปีงบประมาณ ${esc(S.year || '')}</th><td colspan="3">รับผิดชอบหลัก ${J.L[x.name].main} แผน · ร่วมดำเนินการ ${J.L[x.name].co} แผน · กำกับติดตาม ${J.L[x.name].sup} แผน · ดำเนินกิจกรรม ${J.L[x.name].acts} รายการ (ระดับ 1: ${J.L[x.name].lv[1]} · ระดับ 2: ${J.L[x.name].lv[2]} · ระดับ 3: ${J.L[x.name].lv[3]})</td></tr>
+    </tbody></table></section>`;
+  let root = $('#printRoot');
+  if (!root) { root = document.createElement('div'); root.id = 'printRoot'; document.body.appendChild(root); }
+  root.innerHTML = ps.map(jd).join('') + `<section class="pj-page land">${matrixHtml(J)}
+    <div class="pj-keep"><h3 class="pj-sub">เกณฑ์ระดับความยากง่ายของงาน</h3><table class="pj"><tbody>${[1, 2, 3].map(n => `<tr><th>ระดับ ${n} ${DIFF[n].th}</th><td>${esc(DIFF[n].d)}</td><td>${DIFF[n].fit}</td></tr>`).join('')}</tbody></table></div></section>`;
+  document.body.classList.add('printing');   // มีผลเฉพาะตอนพิมพ์ (ดู @media print)
+  const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => window.print(), 80);
+}
+
 /* ---------------- events ---------------- */
 document.addEventListener('click', async e => {
   const t = e.target.closest('[data-act]');
@@ -1459,9 +1896,30 @@ document.addEventListener('click', async e => {
     case 'strat-add': { const l = $('#stratList'); const n = Math.max(0, ...[...l.querySelectorAll('[name=no]')].map(i => Number(i.value) || 0)) + 1; l.insertAdjacentHTML('beforeend', stratRow({ no: n, name: '' })); hydrateIcons(l); l.lastElementChild.querySelector('textarea').focus(); break; }
     case 'staff-add': { const l = $('#staffList'); l.insertAdjacentHTML('beforeend', staffRow({})); hydrateIcons(l); l.lastElementChild.querySelector('input').focus(); break; }
     case 'row-del': t.closest('.le-row').remove(); break;
+    case 'role': {
+      const seg = t.closest('.seg'), n = seg.dataset.pos, r = t.dataset.r;
+      if (r) ED.roles[n] = r; else delete ED.roles[n];
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === t));
+      edCheck(); break;
+    }
+    case 'act-guess': {
+      readActsFromDom();
+      let n = 0; ED.p.activities.forEach(a => { if (!a.level && a.text.trim()) { a.level = guessLevel(a.text); n++; } });
+      renderActs(); toast(n ? `เติมระดับความยากให้ ${n} กิจกรรม — กรุณาตรวจทานก่อนบันทึก` : 'ทุกกิจกรรมระบุระดับความยากแล้ว'); break;
+    }
+    case 'pos-add': openPosEditor(null); break;
+    case 'pos-edit': openPosEditor(positions().find(x => x.id === t.dataset.id)); break;
+    case 'pos-del': deletePosition(t.dataset.id); break;
+    case 'jobs-print': printJobs(); break;
   }
 });
 document.addEventListener('change', e => {
+  const af = e.target.dataset && e.target.dataset.af;
+  if (af && ED) {
+    const i = Number(e.target.closest('.act-ed').dataset.i), a = ED.p.activities[i];
+    if (a) { if (af === 'pos') a.pos = e.target.value; else a.level = Number(e.target.value) || 0; }
+    edCheck(); return;
+  }
   if (e.target.id !== 'yearSel') return;
   const v = e.target.value;
   if (v === '__new') { e.target.value = S.year; openYearModal(); return; }
@@ -1525,7 +1983,7 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { const w = $('#modalRoot .modal-wrap:last-child'); if (w && !w.dataset.busy) closeModal(w); else closeNav(); } });
 $('#scrim').addEventListener('click', closeNav);
-window.addEventListener('hashchange', () => { const r = route(); if (r.id === 'plans') S.filter.s = r.arg || 0; closeNav(); render(); window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' }); });
+window.addEventListener('hashchange', () => { document.body.classList.remove('printing'); const r = route(); if (r.id === 'plans') S.filter.s = r.arg || 0; closeNav(); render(); window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' }); });
 
 /* ---------------- clock ---------------- */
 function tick() {
@@ -1571,7 +2029,7 @@ function wrapText(ctx, text, maxW) {
 
 function pdfColumns() {
   const CW = PG.W - PG.M * 2;
-  const fixed = [['goal', 128], ['act', 178], ['kpi', 172], ['budget', 58], ['resp', 66]];
+  const fixed = [['goal', 126], ['act', 172], ['kpi', 160], ['budget', 56], ['resp', 88]];
   const mw = (CW - fixed.reduce((s, c) => s + c[1], 0)) / 12;
   const C = {}; let x = PG.M;
   fixed.forEach(([k, w]) => { C[k] = { x, w }; x += w; });
@@ -1593,7 +2051,7 @@ function layoutGroup(ctx, C, p) {
     goal: wrapText(ctx, `${p.order}. ${p.title}`, C.goal.w - PX * 2),
     kpi: kp.flatMap((k, i) => wrapText(ctx, (kp.length > 1 ? `${i + 1}. ` : '') + k, C.kpi.w - PX * 2)),
     budget: wrapText(ctx, p.budget || '', C.budget.w - PX * 2),
-    resp: respList(p).flatMap(r => wrapText(ctx, r, C.resp.w - PX * 2)),
+    resp: respShow(p).flatMap(r => wrapText(ctx, r, C.resp.w - PX * 2)),
     acts
   };
 }
@@ -2187,7 +2645,7 @@ const Present = (() => {
         <ol class="sl-list a5">${ps.map(p => `<li><b>${p.strategyNo}.${p.order}</b>${esc(p.title)}</li>`).join('') || '<li>ยังไม่มีแผนงาน</li>'}</ol>
       </div>${num}</section>`;
     }
-    const p = sl.p, kp = kpiList(p), rs = respList(p);
+    const p = sl.p, kp = kpiList(p), rs = respShow(p);
     return `<section class="slide sl-plan">${corners()}<div class="sl-in fit">
       <div class="sl-head a1"><span class="sl-badge"><small>PLAN</small>${p.strategyNo}.${p.order}</span>
         <div><div class="sl-kick">ยุทธศาสตร์ที่ ${sl.s.no} · ${esc(sl.s.name)}</div><h2>${esc(p.title)}</h2></div></div>
